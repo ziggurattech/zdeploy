@@ -7,6 +7,11 @@ class Installer(install):
         print(os.popen('cp zdeploy /usr/bin/').read())
 
 setup(
+        name='zdeploy',
+        url='https://github.com/ziggurattech/zdeploy',
+        author='Fadi Hanna Al-Kass',
+        description='General-purpose host deployment utility'
+        long_description=open('README.md').read(),
         cmdclass={'install': Installer},
         install_requires=[
             'paramiko',
@@ -14,6 +19,6 @@ setup(
             'python-dotenv',
         ],
         dependency_links=[
-            'git+git://github.com/jbardin/scp.py',
+            'https://github.com/jbardin/scp.py/tarball/master',
         ],
 )
