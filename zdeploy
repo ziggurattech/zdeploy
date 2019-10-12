@@ -10,6 +10,9 @@ from paramiko import SSHClient, AutoAddPolicy
 from sys import stdout
 from scp import SCPClient
 
+COMMON_CONFIGS_DIR_NAME='configs'
+COMMON_RECIPES_DIR_NAME='recipes'
+
 class Log:
     def __init__(self, *loggers):
         self.loggers = list(loggers)
@@ -63,7 +66,7 @@ class Node:
         self.config = config
         self.recipe = recipe
         self.recipe_dir_name = recipe.lower()
-        self.recipe_dir_path = 'recipes/%s' % self.recipe_dir_name
+        self.recipe_dir_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe_dir_name)
         self.hostname = hostname
         self.username = username
     def __str__(self):
@@ -151,8 +154,8 @@ def handle_deployment(config_path, log):
     SERVICES = environ.get('SERVICES')
     for service in SERVICES.split(' '):
         HOST_IP = environ.get(service)
-        HOST_USERNAME = environ.get('%s_USERNAME' % service, 'root')
-        node = Node(service.title(), config_path, HOST_IP, HOST_USERNAME)
+        HOST_USER = environ.get('%s_USER' % service, 'root')
+        node = Node(service.title(), config_path, HOST_IP, HOST_USER)
         node.set_logger(log)
         nodes += node.get_requirements()
         nodes.append(node)
@@ -185,9 +188,9 @@ def handle_deployment(config_path, log):
     log.success('%s Deployment took %s to finish' % (config_path, total_deployment_time))
 
 def handle_config(config_dir):
-    for instructions_file_name in listdir('configs/%s' % config_dir):
+    for instructions_file_name in listdir('%s/%s' % (COMMON_CONFIGS_DIR_NAME ,config_dir)):
         log_dir_path = 'log/%s/%s' % (config_dir, instructions_file_name)
-        instructions_file_path = 'configs/%s/%s' % (config_dir, instructions_file_name)
+        instructions_file_path = '%s/%s/%s' % (COMMON_CONFIGS_DIR_NAME, config_dir, instructions_file_name)
         if not isdir(log_dir_path):
             makedirs(log_dir_path)
         log = Log()
@@ -196,8 +199,17 @@ def handle_config(config_dir):
         handle_deployment(instructions_file_path, log)
 
 if __name__ == '__main__':
+    if not isdir(COMMON_CONFIGS_DIR_NAME):
+        raise Exception('Missing configs/ directory')
+
+    if len(listdir(COMMON_CONFIGS_DIR_NAME)) == 0:
+        raise Exception('Missing configs under configs/')
+
+    if not isdir(COMMON_RECIPES_DIR_NAME):
+        raise Exception('Missing recipes/ directory')
+
     parser = ArgumentParser()
-    parser.add_argument('-c', '--configs', nargs='+', required=True, choices=listdir('configs'))
+    parser.add_argument('-c', '--configs', nargs='+', required=True, choices=listdir(COMMON_CONFIGS_DIR_NAME))
     args = parser.parse_args()
     for config_name in args.configs:
         handle_config(config_name)
