@@ -12,6 +12,8 @@ setup(
             'paramiko',
             'requests',
             'python-dotenv',
-            'https://github.com/jbardin/scp.py',
+        ],
+        dependency_links=[
+            'git+https://github.com/jbardin/scp.py',
         ],
 )
