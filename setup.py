@@ -4,7 +4,7 @@ import os
 
 class Installer(install):
     def run(self):
-        print(os.popen('make').read())
+        print(os.popen('cp zdeploy /usr/bin/').read())
 
 setup(
         cmdclass={'install': Installer},
