@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from argparse import ArgumentParser
-from os import listdir, makedirs, environ
+from os import listdir, makedirs, environ, mkdir, chmod
 from os.path import isdir, isfile
 from datetime import datetime
 from dotenv import load_dotenv
@@ -60,9 +60,9 @@ class Node:
         if not config or not len(config.strip()):
             raise Exception('Invalid value for config')
         if not recipe or not len(recipe.strip()):
-            raise Exception("Invalid value for recipe")
+            raise Exception('Invalid value for recipe')
         if not hostname or not len(hostname.strip()):
-            raise Exception("Invalid value for hostname")
+            raise Exception('Invalid value for hostname')
         self.config = config
         self.recipe = recipe
         self.recipe_dir_name = recipe.lower()
@@ -82,7 +82,7 @@ class Node:
     def get_requirements(self):
         if not isdir(self.recipe_dir_path):
             self.log.fatal('Invalid recipe name: %s' % self.recipe_dir_name)
-        req_file = "%s/require" % self.recipe_dir_path
+        req_file = '%s/require' % self.recipe_dir_path
         requirements = []
         if isfile(req_file):
             for requirement in open(req_file).read().split('\n'):
@@ -96,7 +96,7 @@ class Node:
                 requirements.append(node)
         return requirements
     def deploy(self):
-        self.log.info("Deploying %s to %s" % (self.recipe, self.hostname))
+        self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
         client = SSHClient()
         client.load_system_host_keys()
         client.set_missing_host_key_policy(AutoAddPolicy())
@@ -198,18 +198,52 @@ def handle_config(config_dir):
         log.register_logger(open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w+'))
         handle_deployment(instructions_file_path, log)
 
+def init_recipe_template(template_name):
+    if not isdir(template_name):
+        makedirs(template_name)
+    run_script_file_path = '%s/run' % template_name
+    if not isfile(run_script_file_path):
+        run_script = open(run_script_file_path, 'w')
+        run_script.write('#!/bin/bash\n\n')
+        run_script.write('set -e\n\n')
+        run_script.write('echo Deployed successfully')
+        run_script.close()
+    require_file_path = '%s/require' % template_name
+    if not isfile(require_file_path):
+        open(require_file_path, 'w').close()
+
+def init_config_template(template_name):
+    if not isdir(template_name):
+        makedirs(template_name)
+    config = open('%s/config' % template_name, 'w')
+    config.write('export SERVICES=MY_CONFIG MY_CONFIG2\n\n')
+    config.write('export MY_CONFIG=localhost\n\n')
+    config.write('export MY_CONFIG2=localhost\n')
+    config.close()
+
 if __name__ == '__main__':
     if not isdir(COMMON_CONFIGS_DIR_NAME):
-        raise Exception('Missing configs/ directory')
-
-    if len(listdir(COMMON_CONFIGS_DIR_NAME)) == 0:
-        raise Exception('Missing configs under configs/')
-
-    if not isdir(COMMON_RECIPES_DIR_NAME):
-        raise Exception('Missing recipes/ directory')
+        init_config_template('%s/localhost' % (COMMON_CONFIGS_DIR_NAME))
 
     parser = ArgumentParser()
-    parser.add_argument('-c', '--configs', nargs='+', required=True, choices=listdir(COMMON_CONFIGS_DIR_NAME))
+    parser.add_argument('--init-recipes', nargs='+', required=False, default=None)
+    parser.add_argument('--init-configs', nargs='+', required=False, default=None)
+    parser.add_argument('-c', '--configs', nargs='+', required=False, choices=listdir(COMMON_CONFIGS_DIR_NAME), default=None)
+
     args = parser.parse_args()
-    for config_name in args.configs:
-        handle_config(config_name)
+
+    if args.init_recipes:
+        for recipe_template in args.init_recipes:
+            init_recipe_template('%s/%s' % (COMMON_RECIPES_DIR_NAME, recipe_template))
+    if args.init_configs:
+        for config_template in args.init_configs:
+            init_config_template('%s/%s' %(COMMON_CONFIGS_DIR_NAME, config_template))
+    elif args.configs:
+        print(args.configs)
+        if len(listdir(COMMON_CONFIGS_DIR_NAME)) == 0:
+            raise Exception('Missing configs under configs/')
+        if not isdir(COMMON_RECIPES_DIR_NAME):
+            raise Exception('Missing recipes/ directory. Re-run with --init-recipes <recipe names> to generate a recipe template')
+        for config_name in args.configs:
+            handle_config(config_name)
+    
