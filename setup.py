@@ -10,7 +10,7 @@ setup(
         name='zdeploy',
         url='https://github.com/ziggurattech/zdeploy',
         author='Fadi Hanna Al-Kass',
-        description='General-purpose host deployment utility'
+        description='General-purpose host deployment utility',
         long_description=open('README.md').read(),
         cmdclass={'install': Installer},
         install_requires=[
