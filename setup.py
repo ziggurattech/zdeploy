@@ -14,6 +14,6 @@ setup(
             'python-dotenv',
         ],
         dependency_links=[
-            'git+https://github.com/jbardin/scp.py',
+            'https://github.com/jbardin/scp.py',
         ],
 )
