@@ -12,6 +12,6 @@ setup(
             'paramiko',
             'requests',
             'python-dotenv',
-            'git+https://github.com/jbardin/scp.py',
+            'https://github.com/jbardin/scp.py',
         ],
 )
