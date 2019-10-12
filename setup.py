@@ -19,6 +19,6 @@ setup(
             'python-dotenv',
         ],
         dependency_links=[
-            'https://github.com/jbardin/scp.py/tarball/master',
+            'git+https://github.com/jbardin/scp.py/tarball/master',
         ],
 )
