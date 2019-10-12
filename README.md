@@ -9,7 +9,7 @@ Install the tool using the following command, and let's get down to business wit
 $ pip3 install https://github.com/ziggurattech/zdeploy
 ```
 
-Imagine wanting to deploy a postgres Docker instance via docker-compose. You'd start by writing a recipe directory as follows:
+Imagine wanting to deploy a Postgres Docker instance via docker-compose. You'd start by writing a recipe directory as follows:
 
 1. Create a directory and name it `recipes/`.
 2. Now create a recipe directory under `recipes/`, and name it whatever you want. In our case, we're going to call it `postgres`.
