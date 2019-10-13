@@ -226,9 +226,9 @@ if __name__ == '__main__':
         init_config_template('%s/localhost' % (COMMON_CONFIGS_DIR_NAME))
 
     parser = ArgumentParser()
-    parser.add_argument('--init-recipes', nargs='+', required=False, default=None)
-    parser.add_argument('--init-configs', nargs='+', required=False, default=None)
-    parser.add_argument('-c', '--configs', nargs='+', required=False, choices=listdir(COMMON_CONFIGS_DIR_NAME), default=None)
+    parser.add_argument('--init-recipes', help='Generate recepie templates', nargs='+', required=False, default=None)
+    parser.add_argument('--init-configs', help='Generate config templates', nargs='+', required=False, default=None)
+    parser.add_argument('-c', '--configs', help='Deploy to one or more configs', nargs='+', required=False, choices=listdir(COMMON_CONFIGS_DIR_NAME), default=None)
 
     args = parser.parse_args()
 
