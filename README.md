@@ -17,6 +17,9 @@ use the following command to install zdeploy, and let's get down to business wit
 $ pip3 install https://github.com/ziggurattech/zdeploy
 ```
 
+We're going to deploy Postgres and Redis in this walkthrough example. Find a place where you'd like to specify your deployment process and follow along with me.
+
+
 
 ## Author
 [Fadi Hanna Al-Kass](https://github.com/alkass)
