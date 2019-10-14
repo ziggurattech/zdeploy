@@ -19,6 +19,23 @@ $ pip3 install https://github.com/ziggurattech/zdeploy
 
 We're going to deploy Postgres and Redis in this walkthrough example. Find a place where you'd like to specify your deployment process and follow along with me.
 
+* Create a deployment directory and redirect into it
+
+```
+$ mkdir mydeployment && cd mydeployment
+```
+
+> This will be the directory where all your recipes and configs reside.
+
+* Create a few recipes
+
+```
+$ zdeploy --init-recipes docker docker-compose postgres redis
+```
+
+> docker, docker-compose, postgres, and redis are user-specified recipe names. They will all contain the same recipe directory structure, and how we define their internals is what will set them apart eventually.
+
+
 
 
 ## Author
