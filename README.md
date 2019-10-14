@@ -33,7 +33,7 @@ $ mkdir mydeployment && cd mydeployment
 $ zdeploy --init-recipes docker docker-compose postgres redis
 ```
 
-> docker, docker-compose, postgres, and redis are user-specified recipe names. They will all contain the same recipe directory structure, and how we define their internals is what will set them apart eventually.
+> docker, docker-compose, postgres, and redis are user-specified recipe names. They will all contain the same recipe directory structure. How we define their internals is what will set them apart eventually.
 
 Inside each of our newly created recipes you will find 
 
