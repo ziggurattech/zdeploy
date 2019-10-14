@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from argparse import ArgumentParser
-from os import listdir, makedirs, environ, mkdir, chmod
+from os import listdir, makedirs, environ, mkdir
 from os.path import isdir, isfile
 from datetime import datetime
 from dotenv import load_dotenv
