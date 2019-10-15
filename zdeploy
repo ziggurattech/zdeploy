@@ -206,7 +206,7 @@ def init_recipe_template(template_name):
         run_script = open(run_script_file_path, 'w')
         run_script.write('#!/bin/bash\n\n')
         run_script.write('set -e\n\n')
-        run_script.write('# TODO: Your %d deployment procedure' % template_name)
+        run_script.write('# TODO: Your %s deployment procedure' % template_name)
         run_script.write('echo Deployed successfully')
         run_script.close()
     require_file_path = '%s/require' % template_name
