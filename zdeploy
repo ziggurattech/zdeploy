@@ -10,8 +10,8 @@ from paramiko import SSHClient, AutoAddPolicy
 from sys import stdout
 from scp import SCPClient
 
-COMMON_CONFIGS_DIR_NAME='configs'
-COMMON_RECIPES_DIR_NAME='recipes'
+COMMON_CONFIGS_DIR_NAME='configs/'
+COMMON_RECIPES_DIR_NAME='recipes/'
 
 class Log:
     def __init__(self, *loggers):
@@ -47,7 +47,7 @@ class SSH:
     def exec(self, *args):
         cmd = ' '.join(args)
         self.log.info('Running', cmd)
-        _, stdout, stderr = self.client.exec_command('%s 2>&1' % cmd)
+        _, stdout, _ = self.client.exec_command('%s 2>&1' % cmd)
         for line in stdout:
             self.log.info('%s: %s' % (self.recipe_name, line.rstrip()))
         rc = stdout.channel.recv_exit_status()
@@ -242,9 +242,9 @@ if __name__ == '__main__':
     elif args.configs:
         print(args.configs)
         if len(listdir(COMMON_CONFIGS_DIR_NAME)) == 0:
-            raise Exception('Missing configs under configs/')
+            raise Exception('Missing configs under %s' % COMMON_CONFIGS_DIR_NAME)
         if not isdir(COMMON_RECIPES_DIR_NAME):
-            raise Exception('Missing recipes/ directory. Re-run with --init-recipes <recipe names> to generate a recipe template')
+            raise Exception('Missing %s directory. Re-run with --init-recipes <recipe names> to generate a recipe template' % COMMON_RECIPES_DIR_NAME)
         for config_name in args.configs:
             handle_config(config_name)
     
