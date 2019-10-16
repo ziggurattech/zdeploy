@@ -14,7 +14,7 @@ zdeploy utilizes two core concepts (`Recipes` and `Configs`).
 use the following command to install zdeploy, and let's get down to business with a real-world deployment example.
 
 ```
-$ pip3 install https://github.com/ziggurattech/zdeploy
+$ pip3 install git+https://github.com/ziggurattech/zdeploy
 ```
 
 We're going to deploy Postgres and Redis in this walkthrough example. Find a place where you would like to specify your deployment process and follow along with me.
