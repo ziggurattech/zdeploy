@@ -13,6 +13,7 @@ from scp import SCPClient
 COMMON_CONFIGS_DIR_NAME='configs/'
 COMMON_RECIPES_DIR_NAME='recipes/'
 
+
 class Log:
     def __init__(self, *loggers):
         self.loggers = list(loggers)
@@ -199,32 +200,39 @@ def handle_config(config_dir):
         handle_deployment(instructions_file_path, log)
 
 def init_recipe_template(template_name):
-    if not isdir(template_name):
-        makedirs(template_name)
-    run_script_file_path = '%s/run' % template_name
+    template_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, template_name)
+    if not isdir(template_path):
+        makedirs(template_path)
+    run_script_file_path = '%s/run' % template_path
     if not isfile(run_script_file_path):
-        run_script = open(run_script_file_path, 'w')
-        run_script.write('#!/bin/bash\n\n')
-        run_script.write('set -e\n\n')
-        run_script.write('# TODO: Your %s deployment procedure' % template_name)
-        run_script.write('echo Deployed successfully')
-        run_script.close()
-    require_file_path = '%s/require' % template_name
+        open(run_script_file_path, 'w').write('''#!/bin/bash
+
+set -e
+
+# TODO: Add your deployment procedure here
+
+echo Deployed successfully
+''')
+    require_file_path = '%s/require' % template_path
     if not isfile(require_file_path):
         open(require_file_path, 'w').close()
 
 def init_config_template(template_name):
-    if not isdir(template_name):
-        makedirs(template_name)
-    config = open('%s/config' % template_name, 'w')
-    config.write('export SERVICES=MY_CONFIG MY_CONFIG2\n\n')
-    config.write('export MY_CONFIG=localhost\n\n')
-    config.write('export MY_CONFIG2=localhost\n')
-    config.close()
+    template_path = '%s/%s' % (COMMON_CONFIGS_DIR_NAME, template_name)
+    if not isdir(template_path):
+        makedirs(template_path)
+    config_script_file_path = '%s/config' % template_path
+    if not isfile(config_script_file_path):
+        open('%s/config' % template_path, 'w').write('''export RECIPES=MY_RECIPE1 MY_RECIPE2
 
+export MY_RECIPE1=localhost
+
+export MY_RECIPE2= localhost
+''')
+    
 if __name__ == '__main__':
     if not isdir(COMMON_CONFIGS_DIR_NAME):
-        init_config_template('%s/localhost' % (COMMON_CONFIGS_DIR_NAME))
+        init_config_template('localhost')
 
     parser = ArgumentParser()
     parser.add_argument('--init-recipes', help='Generate recepie templates', nargs='+', required=False, default=None)
@@ -235,10 +243,10 @@ if __name__ == '__main__':
 
     if args.init_recipes:
         for recipe_template in args.init_recipes:
-            init_recipe_template('%s/%s' % (COMMON_RECIPES_DIR_NAME, recipe_template))
+            init_recipe_template(recipe_template)
     if args.init_configs:
         for config_template in args.init_configs:
-            init_config_template('%s/%s' %(COMMON_CONFIGS_DIR_NAME, config_template))
+            init_config_template(config_template)
     elif args.configs:
         print(args.configs)
         if len(listdir(COMMON_CONFIGS_DIR_NAME)) == 0:
