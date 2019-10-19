@@ -152,7 +152,7 @@ def handle_deployment(config_path, log):
 
     nodes = []
 
-    SERVICES = environ.get('SERVICES')
+    SERVICES = environ.get('RECIPES')
     for service in SERVICES.split(' '):
         HOST_IP = environ.get(service)
         HOST_USER = environ.get('%s_USER' % service, 'root')
