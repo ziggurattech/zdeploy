@@ -88,7 +88,7 @@ class Node:
         if isfile(req_file):
             for requirement in open(req_file).read().split('\n'):
                 requirement = requirement.strip()
-                if requirement == '':
+                if requirement == '' or requirement.startswith('#'):
                     continue
                 node = Node(recipe=requirement, config=self.config, hostname=self.hostname, username=self.username)
                 node.set_logger(self.log)
