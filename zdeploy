@@ -10,8 +10,8 @@ from paramiko import SSHClient, AutoAddPolicy
 from sys import stdout
 from scp import SCPClient
 
-COMMON_CONFIGS_DIR_NAME='configs/'
-COMMON_RECIPES_DIR_NAME='recipes/'
+COMMON_CONFIGS_DIR_NAME='configs'
+COMMON_RECIPES_DIR_NAME='recipes'
 
 
 class Log:
@@ -19,6 +19,9 @@ class Log:
         self.loggers = list(loggers)
     def register_logger(self, logger):
         self.loggers.append(logger)
+    def register_loggers(self, loggers):
+        for logger in loggers:
+            self.register_logger(logger)
     def write(self, *args):
         message = ' '.join(args)
         for logger in self.loggers:
@@ -56,24 +59,29 @@ class SSH:
             self.log.fail("Failed to run '%s'. Exit code: %d" % (cmd, rc))
             raise Exception('%s failed to run' % cmd)
 
-class Node:
-    def __init__(self, recipe, config, hostname, username):
+class Recipe:
+    def __init__(self, recipe, config, hostname, username, log):
+        self.set_logger(log)
         if not config or not len(config.strip()):
-            raise Exception('Invalid value for config')
+            self.log.fatal('Invalid value for config')
         if not recipe or not len(recipe.strip()):
-            raise Exception('Invalid value for recipe')
+            self.log.fatal('Invalid value for recipe')
         if not hostname or not len(hostname.strip()):
-            raise Exception('Invalid value for hostname')
+            self.log.fatal('Invalid value for hostname')
+        self.set_recipe_name(recipe)
         self.config = config
-        self.recipe = recipe
-        self.recipe_dir_name = recipe.lower()
-        self.recipe_dir_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe_dir_name)
         self.hostname = hostname
         self.username = username
+    def set_recipe_name(self, recipe):
+        for r in listdir(COMMON_RECIPES_DIR_NAME):
+            if recipe.lower() == r.lower():
+                self.recipe = r
+                return
+        self.log.fatal('Invalid recipe name: %s', recipe)
     def __str__(self):
         return '%s -> %s:%s' % (self.recipe, self.username, self.hostname)
-    def get_recipe_name(self):
-        return self.recipe_dir_name
+    def get_name(self):
+        return self.recipe
     def __hash__(self):
         return hash(str(self))
     def __eq__(self, other):
@@ -81,20 +89,18 @@ class Node:
     def set_logger(self, log):
         self.log = log
     def get_requirements(self):
-        if not isdir(self.recipe_dir_path):
-            self.log.fatal('Invalid recipe name: %s' % self.recipe_dir_name)
-        req_file = '%s/require' % self.recipe_dir_path
+        req_file = '%s/%s/require' % (COMMON_RECIPES_DIR_NAME, self.recipe)
         requirements = []
         if isfile(req_file):
             for requirement in open(req_file).read().split('\n'):
-                requirement = requirement.strip()
+                requirement = requirement.strip().lower()
                 if requirement == '' or requirement.startswith('#'):
                     continue
-                node = Node(recipe=requirement, config=self.config, hostname=self.hostname, username=self.username)
-                node.set_logger(self.log)
-                for req in node.get_requirements():
+                recipe = Recipe(recipe=requirement, config=self.config, hostname=self.hostname, username=self.username, log=self.log)
+                recipe.set_logger(self.log)
+                for req in recipe.get_requirements():
                     requirements.append(req)
-                requirements.append(node)
+                requirements.append(recipe)
         return requirements
     def deploy(self):
         self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
@@ -105,22 +111,22 @@ class Node:
 
         ssh = SSH(self.recipe, client, self.log)
 
-        ssh.exec('rm -rf /opt/%s' % self.recipe_dir_name)
+        ssh.exec('rm -rf /opt/%s' % self.recipe)
 
-        self.log.info('Uploading %s to %s' %  (self.recipe_dir_path, self.hostname))
+        self.log.info('Uploading %s to %s' %  (self.recipe, self.hostname))
         scp = SCPClient(client.get_transport())
-        scp.put(self.recipe_dir_path, remote_path='/opt/%s' % self.recipe_dir_name, recursive=True)
-        scp.put(self.config, remote_path='/opt/%s/config' % self.recipe_dir_name)
+        scp.put('%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
+        scp.put(self.config, remote_path='/opt/%s/config' % self.recipe)
         scp.close()
 
         try:
-            ssh.exec('cd /opt/%s && chmod +x ./run && ./run' % self.recipe_dir_name)
+            ssh.exec('cd /opt/%s && chmod +x ./run && ./run' % self.recipe)
             passed = True
         except Exception:
             passed = False
         finally:
-            self.log.info('Deleting /opt/%s from remote host' % self.recipe_dir_name)
-            ssh.exec('rm -rf /opt/%s' % self.recipe_dir_name)
+            self.log.info('Deleting /opt/%s from remote host' % self.recipe)
+            ssh.exec('rm -rf /opt/%s' % self.recipe)
 
         if not passed:
             self.log.fatal('Failed to deploy %s' % self.recipe)
@@ -128,19 +134,20 @@ class Node:
 
         client.close()
 
-class NodeHolder:
+class RecipeProcessor:
     recipes = []
-    def __init__(self, recipes, log):
+    def __init__(self):
+        pass
+    def set_logger(self, log):
         self.log = log
-        self.add_recipes(recipes)
     def add_recipes(self, recipes):
         for recipe in recipes:
             self.add_recipe(recipe)
     def add_recipe(self, recipe):
         if recipe in self.recipes:
-            self.log.warn('%s already added to recipes. Skipping...' % recipe.recipe_dir_name)
+            self.log.warn('%s already added to recipes. Skipping...' % recipe.get_name())
             return
-        self.log.info('Adding %s to recipes list' % recipe.recipe_dir_name)
+        self.log.info('Adding %s to recipes list' % recipe.get_name())
         self.recipes.append(recipe)
     def __iter__(self):
         return iter(self.recipes)
@@ -150,36 +157,39 @@ def handle_deployment(config_path, log):
 
     load_dotenv(config_path)
 
-    nodes = []
+    recipes = RecipeProcessor()
+    recipes.set_logger(log)
 
     SERVICES = environ.get('RECIPES')
     for service in SERVICES.split(' '):
         HOST_IP = environ.get(service)
         HOST_USER = environ.get('%s_USER' % service, 'root')
-        node = Node(service.title(), config_path, HOST_IP, HOST_USER)
-        node.set_logger(log)
-        nodes += node.get_requirements()
-        nodes.append(node)
+        recipe = Recipe(service, config_path, HOST_IP, HOST_USER, log)
+        recipe.set_logger(log)
+        recipes.add_recipes(recipe.get_requirements())
+        recipes.add_recipe(recipe)
+    
+    exit(0)
 
     started_all = datetime.now()
     log.info('Started %s deployment at %s on %s' % 
         (config_path,
         started_all.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
-    for node in NodeHolder(nodes, log):
+    for recipe in recipes:
         started_recipe = datetime.now()
         log.info('Started %s recipe deployment at %s on %s' %
-            (node.get_recipe_name(),
+            (recipe.get_recipe_name(),
             started_recipe.strftime('%H:%M:%S'),
             started_all.strftime('%Y-%m-%d')))
-        node.deploy()
+        recipe.deploy()
         ended_recipe = datetime.now()
         log.info('Ended %s recipe deployment at %s on %s' %
-        (node.get_recipe_name(),
+        (recipe.get_recipe_name(),
         ended_recipe.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
         total_recipe_time = ended_recipe - started_recipe
-        log.success('Recipe %s took %s to deploy' % (node.get_recipe_name(), total_recipe_time))
+        log.success('Recipe %s took %s to deploy' % (recipe.get_recipe_name(), total_recipe_time))
     ended_all = datetime.now()
     total_deployment_time = ended_all - started_all
     log.info('Ended %s deployment at %s on %s' %
@@ -194,64 +204,19 @@ def handle_config(config_dir):
         instructions_file_path = '%s/%s/%s' % (COMMON_CONFIGS_DIR_NAME, config_dir, instructions_file_name)
         if not isdir(log_dir_path):
             makedirs(log_dir_path)
-        log = Log()
-        log.register_logger(stdout)
-        log.register_logger(open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w+'))
+        log = Log(stdout, open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w+'))
         handle_deployment(instructions_file_path, log)
-
-def init_recipe_template(template_name):
-    template_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, template_name)
-    if not isdir(template_path):
-        makedirs(template_path)
-    run_script_file_path = '%s/run' % template_path
-    if not isfile(run_script_file_path):
-        open(run_script_file_path, 'w').write('''#!/bin/bash
-
-set -e
-
-# TODO: Add your deployment procedure here
-
-echo Deployed successfully
-''')
-    require_file_path = '%s/require' % template_path
-    if not isfile(require_file_path):
-        open(require_file_path, 'w').close()
-
-def init_config_template(template_name):
-    template_path = '%s/%s' % (COMMON_CONFIGS_DIR_NAME, template_name)
-    if not isdir(template_path):
-        makedirs(template_path)
-    config_script_file_path = '%s/config' % template_path
-    if not isfile(config_script_file_path):
-        open('%s/config' % template_path, 'w').write('''export RECIPES=MY_RECIPE1 MY_RECIPE2
-
-export MY_RECIPE1=localhost
-
-export MY_RECIPE2= localhost
-''')
     
 if __name__ == '__main__':
-    if not isdir(COMMON_CONFIGS_DIR_NAME):
-        init_config_template('localhost')
-
     parser = ArgumentParser()
-    parser.add_argument('--init-recipes', help='Generate recepie templates', nargs='+', required=False, default=None)
-    parser.add_argument('--init-configs', help='Generate config templates', nargs='+', required=False, default=None)
-    parser.add_argument('-c', '--configs', help='Deploy to one or more configs', nargs='+', required=False, choices=listdir(COMMON_CONFIGS_DIR_NAME), default=None)
-
+    parser.add_argument(
+        '-c',
+        '--configs',
+        help='Deploy to one or more configs in a staged order',
+        nargs='+',
+        required=True,
+        choices=listdir(COMMON_CONFIGS_DIR_NAME) if isdir(COMMON_CONFIGS_DIR_NAME) else ())
     args = parser.parse_args()
-
-    if args.init_recipes:
-        for recipe_template in args.init_recipes:
-            init_recipe_template(recipe_template)
-    if args.init_configs:
-        for config_template in args.init_configs:
-            init_config_template(config_template)
-    elif args.configs:
-        if len(listdir(COMMON_CONFIGS_DIR_NAME)) == 0:
-            raise Exception('Missing configs under %s' % COMMON_CONFIGS_DIR_NAME)
-        if not isdir(COMMON_RECIPES_DIR_NAME):
-            raise Exception('Missing %s directory. Re-run with --init-recipes <recipe names> to generate a recipe template' % COMMON_RECIPES_DIR_NAME)
-        for config_name in args.configs:
-            handle_config(config_name)
+    for config_name in args.configs:
+        handle_config(config_name)
     
