@@ -12,6 +12,7 @@ from scp import SCPClient
 
 COMMON_CONFIGS_DIR_NAME='configs'
 COMMON_RECIPES_DIR_NAME='recipes'
+COMMON_LOG_DIR_NAME='log'
 
 
 class Log:
@@ -28,7 +29,7 @@ class Log:
             logger.write('%s\n' % message)
     def fatal(self, *args):
         self.fail(*args)
-        raise Exception(' '.join(args))
+        exit(1)
     def fail(self, *args):
         self.write('\033[0;31m', *args, '\033[0;00m')
     def warn(self, *args):
@@ -77,7 +78,7 @@ class Recipe:
             if recipe.lower() == r.lower():
                 self.recipe = r
                 return
-        self.log.fatal('Invalid recipe name: %s', recipe)
+        self.log.fatal('Invalid recipe name: %s' % recipe)
     def __str__(self):
         return '%s -> %s:%s' % (self.recipe, self.username, self.hostname)
     def get_name(self):
@@ -152,7 +153,7 @@ class RecipeProcessor:
     def __iter__(self):
         return iter(self.recipes)
 
-def handle_deployment(config_path, log):
+def deploy(config_path, log):
     log.info('Config:', config_path)
 
     load_dotenv(config_path)
@@ -160,16 +161,17 @@ def handle_deployment(config_path, log):
     recipes = RecipeProcessor()
     recipes.set_logger(log)
 
-    SERVICES = environ.get('RECIPES')
-    for service in SERVICES.split(' '):
-        HOST_IP = environ.get(service)
-        HOST_USER = environ.get('%s_USER' % service, 'root')
-        recipe = Recipe(service, config_path, HOST_IP, HOST_USER, log)
+    recipe_names = environ.get('RECIPES')
+    for recipe_name in recipe_names.split(' '):
+        recipe_name = recipe_name.strip()
+        HOST_IP = environ.get(recipe_name)
+        if HOST_IP is None:
+            log.fatal('%s is undefined' % recipe_name)
+        HOST_USER = environ.get('%s_USER' % recipe_name, 'root')
+        recipe = Recipe(recipe_name, config_path, HOST_IP, HOST_USER, log)
         recipe.set_logger(log)
         recipes.add_recipes(recipe.get_requirements())
         recipes.add_recipe(recipe)
-    
-    exit(0)
 
     started_all = datetime.now()
     log.info('Started %s deployment at %s on %s' % 
@@ -179,17 +181,17 @@ def handle_deployment(config_path, log):
     for recipe in recipes:
         started_recipe = datetime.now()
         log.info('Started %s recipe deployment at %s on %s' %
-            (recipe.get_recipe_name(),
+            (recipe.get_name(),
             started_recipe.strftime('%H:%M:%S'),
             started_all.strftime('%Y-%m-%d')))
         recipe.deploy()
         ended_recipe = datetime.now()
         log.info('Ended %s recipe deployment at %s on %s' %
-        (recipe.get_recipe_name(),
+        (recipe.get_name(),
         ended_recipe.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
         total_recipe_time = ended_recipe - started_recipe
-        log.success('Recipe %s took %s to deploy' % (recipe.get_recipe_name(), total_recipe_time))
+        log.success('Recipe %s took %s to deploy' % (recipe.get_name(), total_recipe_time))
     ended_all = datetime.now()
     total_deployment_time = ended_all - started_all
     log.info('Ended %s deployment at %s on %s' %
@@ -198,14 +200,18 @@ def handle_deployment(config_path, log):
         started_all.strftime('%Y-%m-%d')))
     log.success('%s Deployment took %s to finish' % (config_path, total_deployment_time))
 
-def handle_config(config_dir):
-    for instructions_file_name in listdir('%s/%s' % (COMMON_CONFIGS_DIR_NAME ,config_dir)):
-        log_dir_path = 'log/%s/%s' % (config_dir, instructions_file_name)
-        instructions_file_path = '%s/%s/%s' % (COMMON_CONFIGS_DIR_NAME, config_dir, instructions_file_name)
-        if not isdir(log_dir_path):
-            makedirs(log_dir_path)
-        log = Log(stdout, open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w+'))
-        handle_deployment(instructions_file_path, log)
+def handle_config(config_name):
+    log_dir_path = '%s/%s' % (COMMON_LOG_DIR_NAME, config_name)
+    if not isdir(log_dir_path):
+        makedirs(log_dir_path)
+    log = Log()
+    log.register_logger(stdout)
+    log.register_logger(open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w'))
+    deploy('%s/%s' % (COMMON_CONFIGS_DIR_NAME, config_name), log)
+
+def handle_configs(config_names):
+    for config_name in config_names:
+        handle_config(config_name)
     
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -217,6 +223,5 @@ if __name__ == '__main__':
         required=True,
         choices=listdir(COMMON_CONFIGS_DIR_NAME) if isdir(COMMON_CONFIGS_DIR_NAME) else ())
     args = parser.parse_args()
-    for config_name in args.configs:
-        handle_config(config_name)
+    handle_configs(args.configs)
     
