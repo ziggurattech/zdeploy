@@ -139,10 +139,13 @@ class Recipe:
 
         recipes_hash_file_name = '/tmp/%s.zdeploy' % recipes_hash
 
-        ssh.exec('touch %s' % recipes_hash_file_name)
+        ssh.exec('touch %s' % recipes_hash_file_name, show_command=False)
 
         recipe_hash = self.get_thorough_hash()
-        if ssh.exec('grep -q %s %s' % (recipe_hash, recipes_hash_file_name), bail_on_failure=False, show_error=False) is 0:
+        if ssh.exec('grep -q %s %s' % (recipe_hash, recipes_hash_file_name),
+            bail_on_failure=False,
+            show_error=False,
+            show_command=False) is 0:
             self.log.success('Recipe already deployed. Skipping...')
             return
 
