@@ -9,11 +9,11 @@ import paramiko
 from paramiko import SSHClient, AutoAddPolicy
 from sys import stdout
 from scp import SCPClient
+from hashlib import md5
 
 COMMON_CONFIGS_DIR_NAME='configs'
 COMMON_RECIPES_DIR_NAME='recipes'
 COMMON_LOG_DIR_NAME='log'
-
 
 class Log:
     def __init__(self, *loggers):
@@ -49,17 +49,21 @@ class SSH:
         self.recipe_name = recipe_name
         self.client = client
         self.log = log
-    def exec(self, *args):
+    def exec(self, *args, bail_on_failure=True, show_command=True, show_output=True, show_error=True):
         cmd = ' '.join(args)
-        self.log.info('Running', cmd)
+        if show_command:
+            self.log.info('Running', cmd)
         _, stdout, _ = self.client.exec_command('%s 2>&1' % cmd)
-        for line in stdout:
-            self.log.info('%s: %s' % (self.recipe_name, line.rstrip()))
+        if show_output:
+            for line in stdout:
+                self.log.info('%s: %s' % (self.recipe_name, line.rstrip()))
         rc = stdout.channel.recv_exit_status()
         if rc is not 0:
-            self.log.fail("Failed to run '%s'. Exit code: %d" % (cmd, rc))
-            raise Exception('%s failed to run' % cmd)
-
+            if show_error:
+                self.log.fail("Failed to run '%s'. Exit code: %d" % (cmd, rc))
+            if bail_on_failure:
+                raise Exception('%s failed to run' % cmd)
+        return rc
 class Recipe:
     def __init__(self, recipe, config, hostname, username, log):
         self.set_logger(log)
@@ -87,6 +91,22 @@ class Recipe:
         return hash(str(self))
     def __eq__(self, other):
         return hash(self) == hash(other)
+    def get_thorough_hash(self, dir_path=None):
+        if dir_path is None:
+            dir_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe)
+        hashes = ''
+        for recipe in self.get_requirements():
+            hashes += recipe.get_thorough_hash()
+        hashes += md5(str(self).encode()).hexdigest()
+        for node in listdir(dir_path):
+            rel_path = '%s/%s' % (dir_path, node)
+            if isfile(rel_path):
+                file_hash = md5(open(rel_path).read().encode()).hexdigest()
+                hashes += file_hash
+            elif isdir(rel_path):
+                hashes += self.get_thorough_hash(rel_path)
+        return md5(hashes.encode()).hexdigest()
+        
     def set_logger(self, log):
         self.log = log
     def get_requirements(self):
@@ -94,16 +114,21 @@ class Recipe:
         requirements = []
         if isfile(req_file):
             for requirement in open(req_file).read().split('\n'):
-                requirement = requirement.strip().lower()
+                requirement = requirement.strip()
                 if requirement == '' or requirement.startswith('#'):
                     continue
-                recipe = Recipe(recipe=requirement, config=self.config, hostname=self.hostname, username=self.username, log=self.log)
+                recipe = Recipe(
+                    recipe=requirement,
+                    config=self.config,
+                    hostname=self.hostname,
+                    username=self.username,
+                    log=self.log)
                 recipe.set_logger(self.log)
                 for req in recipe.get_requirements():
                     requirements.append(req)
                 requirements.append(recipe)
         return requirements
-    def deploy(self):
+    def deploy(self, recipes_hash):
         self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
         client = SSHClient()
         client.load_system_host_keys()
@@ -111,6 +136,15 @@ class Recipe:
         client.connect(hostname=self.hostname, port=22, username=self.username)
 
         ssh = SSH(self.recipe, client, self.log)
+
+        recipes_hash_file_name = '/tmp/%s.zdeploy' % recipes_hash
+
+        ssh.exec('touch %s' % recipes_hash_file_name)
+
+        recipe_hash = self.get_thorough_hash()
+        if ssh.exec('grep -q %s %s' % (recipe_hash, recipes_hash_file_name), bail_on_failure=False, show_error=False) is 0:
+            self.log.success('Recipe already deployed. Skipping...')
+            return
 
         ssh.exec('rm -rf /opt/%s' % self.recipe)
 
@@ -133,6 +167,8 @@ class Recipe:
             self.log.fatal('Failed to deploy %s' % self.recipe)
         self.log.success('Done with %s' % self.recipe)
 
+        ssh.exec('echo %s >> %s' % (recipe_hash, recipes_hash_file_name))
+
         client.close()
 
 class RecipeProcessor:
@@ -150,6 +186,8 @@ class RecipeProcessor:
             return
         self.log.info('Adding %s to recipes list' % recipe.get_name())
         self.recipes.append(recipe)
+    def get_hash(self):
+        return md5(' '.join([str(recipe) for recipe in self.recipes]).encode()).hexdigest()
     def __iter__(self):
         return iter(self.recipes)
 
@@ -184,21 +222,21 @@ def deploy(config_path, log):
             (recipe.get_name(),
             started_recipe.strftime('%H:%M:%S'),
             started_all.strftime('%Y-%m-%d')))
-        recipe.deploy()
+        recipe.deploy(recipes.get_hash())
         ended_recipe = datetime.now()
         log.info('Ended %s recipe deployment at %s on %s' %
         (recipe.get_name(),
         ended_recipe.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
         total_recipe_time = ended_recipe - started_recipe
-        log.success('Recipe %s took %s to deploy' % (recipe.get_name(), total_recipe_time))
+        log.success('%s finished in %s' % (recipe.get_name(), total_recipe_time))
     ended_all = datetime.now()
     total_deployment_time = ended_all - started_all
     log.info('Ended %s deployment at %s on %s' %
         (config_path,
         ended_all.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
-    log.success('%s Deployment took %s to finish' % (config_path, total_deployment_time))
+    log.success('%s finished in %s' % (config_path, total_deployment_time))
 
 def handle_config(config_name):
     log_dir_path = '%s/%s' % (COMMON_LOG_DIR_NAME, config_name)
