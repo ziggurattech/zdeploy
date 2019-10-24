@@ -146,7 +146,7 @@ class Recipe:
             bail_on_failure=False,
             show_error=False,
             show_command=False) is 0:
-            self.log.success('Recipe already deployed. Skipping...')
+            self.log.success('%s already deployed. Skipping...' % self.recipe)
             return
 
         ssh.exec('rm -rf /opt/%s' % self.recipe)
@@ -170,7 +170,7 @@ class Recipe:
             self.log.fatal('Failed to deploy %s' % self.recipe)
         self.log.success('Done with %s' % self.recipe)
 
-        ssh.exec('echo %s >> %s' % (recipe_hash, recipes_hash_file_name))
+        ssh.exec('echo %s >> %s' % (recipe_hash, recipes_hash_file_name), show_command=False)
 
         client.close()
 
