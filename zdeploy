@@ -10,10 +10,15 @@ from paramiko import SSHClient, AutoAddPolicy
 from sys import stdout
 from scp import SCPClient
 from hashlib import md5
+from json import loads
 
-COMMON_CONFIGS_DIR_NAME='configs'
-COMMON_RECIPES_DIR_NAME='recipes'
-COMMON_LOG_DIR_NAME='log'
+config = {}
+if isfile('./config.json'):
+    config = loads(open('./config.json').read())
+
+COMMON_CONFIGS_DIR_NAME = config.get('configs', 'configs')
+COMMON_RECIPES_DIR_NAME = config.get('recipes', 'recipes')
+COMMON_LOG_DIR_NAME = config.get('log', 'log')
 
 class Log:
     def __init__(self, *loggers):
@@ -149,7 +154,7 @@ class Recipe:
             self.log.success('%s already deployed. Skipping...' % self.recipe)
             return
 
-        ssh.exec('rm -rf /opt/%s' % self.recipe)
+        ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
 
         self.log.info('Uploading %s to %s' %  (self.recipe, self.hostname))
         scp = SCPClient(client.get_transport())
@@ -158,13 +163,13 @@ class Recipe:
         scp.close()
 
         try:
-            ssh.exec('cd /opt/%s && chmod +x ./run && ./run' % self.recipe)
+            ssh.exec('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
             passed = True
         except Exception:
             passed = False
         finally:
             self.log.info('Deleting /opt/%s from remote host' % self.recipe)
-            ssh.exec('rm -rf /opt/%s' % self.recipe)
+            ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
 
         if not passed:
             self.log.fatal('Failed to deploy %s' % self.recipe)
@@ -207,7 +212,7 @@ def deploy(config_path, log):
         recipe_name = recipe_name.strip()
         HOST_IP = environ.get(recipe_name)
         if HOST_IP is None:
-            log.fatal('%s is undefined' % recipe_name)
+            log.fatal('%s is undefined in %s' % (recipe_name, config_path))
         HOST_USER = environ.get('%s_USER' % recipe_name, 'root')
         recipe = Recipe(recipe_name, config_path, HOST_IP, HOST_USER, log)
         recipe.set_logger(log)
