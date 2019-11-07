@@ -156,7 +156,6 @@ class Recipe:
 
         ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
 
-        self.log.info('Uploading %s to %s' %  (self.recipe, self.hostname))
         scp = SCPClient(client.get_transport())
         scp.put('%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
         scp.put(self.config, remote_path='/opt/%s/config' % self.recipe)
