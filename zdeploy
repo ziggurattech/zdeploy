@@ -19,6 +19,7 @@ if isfile('./config.json'):
 COMMON_CONFIGS_DIR_NAME = config.get('configs', 'configs')
 COMMON_RECIPES_DIR_NAME = config.get('recipes', 'recipes')
 COMMON_LOG_DIR_NAME = config.get('log', 'log')
+COMMON_INSTALLER = config.get('installer', 'apt-get install -y')
 
 class Log:
     def __init__(self, *loggers):
@@ -70,7 +71,10 @@ class SSH:
                 raise Exception('%s failed to run' % cmd)
         return rc
 class Recipe:
-    def __init__(self, recipe, config, hostname, username, log):
+    class Type:
+        DEFINED = 1
+        VIRTUAL = 2
+    def __init__(self, recipe, parent_recipe, config, hostname, username, log):
         self.set_logger(log)
         if not config or not len(config.strip()):
             self.log.fatal('Invalid value for config')
@@ -78,16 +82,24 @@ class Recipe:
             self.log.fatal('Invalid value for recipe')
         if not hostname or not len(hostname.strip()):
             self.log.fatal('Invalid value for hostname')
-        self.set_recipe_name(recipe)
+        self.parent_recipe = parent_recipe
+        self.set_recipe_name_and_type(recipe)
         self.config = config
         self.hostname = hostname
         self.username = username
-    def set_recipe_name(self, recipe):
+    def set_recipe_name_and_type(self, recipe):
         for r in listdir(COMMON_RECIPES_DIR_NAME):
             if recipe.lower() == r.lower():
                 self.recipe = r
+                if self.parent_recipe == r:
+                    # Recipe references itself
+                    self.log.fatal('Invalid recipe: %s references itself' % r)
+                else:
+                    self._type = self.Type.DEFINED
                 return
-        self.log.fatal('Invalid recipe name: %s' % recipe)
+        self.recipe = recipe
+        self._type = self.Type.VIRTUAL
+        self.command = '%s %s' % (COMMON_INSTALLER, recipe)
     def __str__(self):
         return '%s -> %s:%s' % (self.recipe, self.username, self.hostname)
     def get_name(self):
@@ -97,19 +109,22 @@ class Recipe:
     def __eq__(self, other):
         return hash(self) == hash(other)
     def get_thorough_hash(self, dir_path=None):
-        if dir_path is None:
-            dir_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe)
         hashes = ''
-        for recipe in self.get_requirements():
-            hashes += recipe.get_thorough_hash()
-        hashes += md5(str(self).encode()).hexdigest()
-        for node in listdir(dir_path):
-            rel_path = '%s/%s' % (dir_path, node)
-            if isfile(rel_path):
-                file_hash = md5(open(rel_path).read().encode()).hexdigest()
-                hashes += file_hash
-            elif isdir(rel_path):
-                hashes += self.get_thorough_hash(rel_path)
+        if self._type == self.Type.VIRTUAL:
+            hashes = md5(self.recipe.encode()).hexdigest()
+        elif self._type == self.Type.DEFINED:
+            if dir_path is None:
+                dir_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe)
+            for recipe in self.get_requirements():
+                hashes += recipe.get_thorough_hash()
+            hashes += md5(str(self).encode()).hexdigest()
+            for node in listdir(dir_path):
+                rel_path = '%s/%s' % (dir_path, node)
+                if isfile(rel_path):
+                    file_hash = md5(open(rel_path).read().encode()).hexdigest()
+                    hashes += file_hash
+                elif isdir(rel_path):
+                    hashes += self.get_thorough_hash(rel_path)
         return md5(hashes.encode()).hexdigest()
         
     def set_logger(self, log):
@@ -124,6 +139,7 @@ class Recipe:
                     continue
                 recipe = Recipe(
                     recipe=requirement,
+                    parent_recipe=self.recipe,
                     config=self.config,
                     hostname=self.hostname,
                     username=self.username,
@@ -153,22 +169,27 @@ class Recipe:
             show_command=False) is 0:
             self.log.success('%s already deployed. Skipping...' % self.recipe)
             return
+        
+        if self._type == self.Type.DEFINED:
+            ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
 
-        ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
-
-        scp = SCPClient(client.get_transport())
-        scp.put('%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
-        scp.put(self.config, remote_path='/opt/%s/config' % self.recipe)
-        scp.close()
+            scp = SCPClient(client.get_transport())
+            scp.put('%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
+            scp.put(self.config, remote_path='/opt/%s/config' % self.recipe)
+            scp.close()
 
         try:
-            ssh.exec('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
+            if self._type == self.Type.VIRTUAL:
+                ssh.exec(self.command)
+            elif self._type == self.Type.DEFINED:
+                ssh.exec('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
             passed = True
         except Exception:
             passed = False
         finally:
-            self.log.info('Deleting /opt/%s from remote host' % self.recipe)
-            ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
+            if self._type == self.Type.DEFINED:
+                self.log.info('Deleting /opt/%s from remote host' % self.recipe)
+                ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
 
         if not passed:
             self.log.fatal('Failed to deploy %s' % self.recipe)
@@ -193,6 +214,11 @@ class RecipeProcessor:
             return
         self.log.info('Adding %s to recipes list' % recipe.get_name())
         self.recipes.append(recipe)
+
+        if recipe._type == Recipe.Type.VIRTUAL:
+            self.log.warn("Recipe %s doesn't correspond to anything defined under the %s directory" % (recipe.recipe, COMMON_RECIPES_DIR_NAME))
+            self.log.warn('%s will be marked virtual and execute as %s' % (recipe.recipe, recipe.command))
+            self.log.warn('If you want to use a different package manager, add an "installer" field to your config.json file')
     def get_hash(self):
         return md5(' '.join([str(recipe) for recipe in self.recipes]).encode()).hexdigest()
     def __iter__(self):
@@ -213,7 +239,7 @@ def deploy(config_path, log):
         if HOST_IP is None:
             log.fatal('%s is undefined in %s' % (recipe_name, config_path))
         HOST_USER = environ.get('%s_USER' % recipe_name, 'root')
-        recipe = Recipe(recipe_name, config_path, HOST_IP, HOST_USER, log)
+        recipe = Recipe(recipe_name, None, config_path, HOST_IP, HOST_USER, log)
         recipe.set_logger(log)
         recipes.add_recipes(recipe.get_requirements())
         recipes.add_recipe(recipe)
