@@ -233,7 +233,9 @@ def deploy(config_path, log):
     recipes.set_logger(log)
 
     recipe_names = environ.get('RECIPES')
-    for recipe_name in recipe_names.split(','):
+    if recipe_names.startswith('(') and recipe_names.endswith(')'):
+        recipe_names = recipe_names[1:-1]
+    for recipe_name in recipe_names.split(' '):
         recipe_name = recipe_name.strip()
         HOST_IP = environ.get(recipe_name)
         if HOST_IP is None:
