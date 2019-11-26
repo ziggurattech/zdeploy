@@ -108,7 +108,7 @@ class Recipe:
         return hash(str(self))
     def __eq__(self, other):
         return hash(self) == hash(other)
-    def get_thorough_hash(self, dir_path=None):
+    def get_deep_hash(self, dir_path=None):
         hashes = ''
         if self._type == self.Type.VIRTUAL:
             hashes = md5(self.recipe.encode()).hexdigest()
@@ -116,7 +116,7 @@ class Recipe:
             if dir_path is None:
                 dir_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe)
             for recipe in self.get_requirements():
-                hashes += recipe.get_thorough_hash()
+                hashes += recipe.get_deep_hash()
             hashes += md5(str(self).encode()).hexdigest()
             for node in listdir(dir_path):
                 rel_path = '%s/%s' % (dir_path, node)
@@ -124,7 +124,7 @@ class Recipe:
                     file_hash = md5(open(rel_path).read().encode()).hexdigest()
                     hashes += file_hash
                 elif isdir(rel_path):
-                    hashes += self.get_thorough_hash(rel_path)
+                    hashes += self.get_deep_hash(rel_path)
         return md5(hashes.encode()).hexdigest()
         
     def set_logger(self, log):
@@ -162,7 +162,7 @@ class Recipe:
 
         ssh.exec('touch %s' % recipes_hash_file_name, show_command=False)
 
-        recipe_hash = self.get_thorough_hash()
+        recipe_hash = self.get_deep_hash()
         if ssh.exec('grep -q %s %s' % (recipe_hash, recipes_hash_file_name),
             bail_on_failure=False,
             show_error=False,
