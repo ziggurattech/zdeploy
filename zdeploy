@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from argparse import ArgumentParser
-from os import listdir, makedirs, environ, mkdir
+from os import listdir, makedirs, environ
 from os.path import isdir, isfile
 from datetime import datetime
 from dotenv import load_dotenv
@@ -18,6 +18,7 @@ if isfile('./config.json'):
 
 COMMON_CONFIGS_DIR_NAME = config.get('configs', 'configs')
 COMMON_RECIPES_DIR_NAME = config.get('recipes', 'recipes')
+COMMON_HISTORY_DIR_NAME = config.get('history', 'history')
 COMMON_LOG_DIR_NAME = config.get('log', 'log')
 COMMON_INSTALLER = config.get('installer', 'apt-get install -y')
 
@@ -148,7 +149,7 @@ class Recipe:
                     requirements.append(req)
                 requirements.append(recipe)
         return requirements
-    def deploy(self, recipes_hash):
+    def deploy(self):
         self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
         client = SSHClient()
         client.load_system_host_keys()
@@ -157,18 +158,6 @@ class Recipe:
 
         ssh = SSH(self.recipe, client, self.log)
 
-        recipes_hash_file_name = '/tmp/%s.zdeploy' % recipes_hash
-
-        ssh.exec('touch %s' % recipes_hash_file_name, show_command=False)
-
-        recipe_hash = self.get_deep_hash()
-        if ssh.exec('grep -q %s %s' % (recipe_hash, recipes_hash_file_name),
-            bail_on_failure=False,
-            show_error=False,
-            show_command=False) is 0:
-            self.log.success('%s already deployed. Skipping...' % self.recipe)
-            return
-        
         if self._type == self.Type.DEFINED:
             ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
 
@@ -193,8 +182,6 @@ class Recipe:
         if not passed:
             self.log.fatal('Failed to deploy %s' % self.recipe)
         self.log.success('Done with %s' % self.recipe)
-
-        ssh.exec('echo %s >> %s' % (recipe_hash, recipes_hash_file_name), show_command=False)
 
         client.close()
 
@@ -223,8 +210,8 @@ class RecipeProcessor:
     def __iter__(self):
         return iter(self.recipes)
 
-def deploy(config_path, log):
-    log.info('Config:', config_path)
+def deploy(config_path, history_dir_path, log):
+    log.info('Config file:', config_path)
 
     load_dotenv(config_path)
 
@@ -257,13 +244,20 @@ def deploy(config_path, log):
         (config_path,
         started_all.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
+    deployment_history_path = '%s/%s' % (history_dir_path, recipes.get_hash())
+    if not isdir(deployment_history_path):
+        makedirs(deployment_history_path)
     for recipe in recipes:
+        recipe_history_path = '%s/%s' % (deployment_history_path, recipe.get_name())
+        if isfile(recipe_history_path) and recipe.get_deep_hash() in open(recipe_history_path, 'r').read():
+            log.warn('%s already deployed. Skipping...' % recipe.get_name())
+            continue
         started_recipe = datetime.now()
         log.info('Started %s recipe deployment at %s on %s' %
             (recipe.get_name(),
             started_recipe.strftime('%H:%M:%S'),
             started_all.strftime('%Y-%m-%d')))
-        recipe.deploy(recipes.get_hash())
+        recipe.deploy()
         ended_recipe = datetime.now()
         log.info('Ended %s recipe deployment at %s on %s' %
         (recipe.get_name(),
@@ -271,6 +265,7 @@ def deploy(config_path, log):
         started_all.strftime('%Y-%m-%d')))
         total_recipe_time = ended_recipe - started_recipe
         log.success('%s finished in %s' % (recipe.get_name(), total_recipe_time))
+        open(recipe_history_path, 'w').write(recipe.get_deep_hash())
     ended_all = datetime.now()
     total_deployment_time = ended_all - started_all
     log.info('Ended %s deployment at %s on %s' %
@@ -278,15 +273,21 @@ def deploy(config_path, log):
         ended_all.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
     log.success('%s finished in %s' % (config_path, total_deployment_time))
+    log.info('Deployment hash is %s' % recipes.get_hash())
+    log.info('Delete %s to to enforce redeployment' % deployment_history_path)
+    log.info('Delete specific files from %s to enforce partial redeployment' % deployment_history_path)
 
 def handle_config(config_name):
     log_dir_path = '%s/%s' % (COMMON_LOG_DIR_NAME, config_name)
+    history_dir_path = '%s/%s' % (COMMON_HISTORY_DIR_NAME, config_name)
     if not isdir(log_dir_path):
         makedirs(log_dir_path)
+    if not isdir(history_dir_path):
+        makedirs(history_dir_path)
     log = Log()
     log.register_logger(stdout)
     log.register_logger(open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w'))
-    deploy('%s/%s' % (COMMON_CONFIGS_DIR_NAME, config_name), log)
+    deploy('%s/%s' % (COMMON_CONFIGS_DIR_NAME, config_name), history_dir_path, log)
 
 def handle_configs(config_names):
     for config_name in config_names:
