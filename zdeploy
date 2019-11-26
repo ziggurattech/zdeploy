@@ -75,7 +75,7 @@ class Recipe:
         DEFINED = 1
         VIRTUAL = 2
     def __init__(self, recipe, parent_recipe, config, hostname, username, log):
-        self.set_logger(log)
+        self.log = log
         if not config or not len(config.strip()):
             self.log.fatal('Invalid value for config')
         if not recipe or not len(recipe.strip()):
@@ -87,6 +87,9 @@ class Recipe:
         self.config = config
         self.hostname = hostname
         self.username = username
+        self.properties = {}
+    def set_property(self, key, value):
+        self.properties[key] = value
     def set_recipe_name_and_type(self, recipe):
         for r in listdir(COMMON_RECIPES_DIR_NAME):
             if recipe.lower() == r.lower():
@@ -101,7 +104,7 @@ class Recipe:
         self._type = self.Type.VIRTUAL
         self.command = '%s %s' % (COMMON_INSTALLER, recipe)
     def __str__(self):
-        return '%s -> %s:%s' % (self.recipe, self.username, self.hostname)
+        return '%s -> %s:%s :: %s' % (self.recipe, self.username, self.hostname, self.properties)
     def get_name(self):
         return self.recipe
     def __hash__(self):
@@ -126,9 +129,6 @@ class Recipe:
                 elif isdir(rel_path):
                     hashes += self.get_deep_hash(rel_path)
         return md5(hashes.encode()).hexdigest()
-        
-    def set_logger(self, log):
-        self.log = log
     def get_requirements(self):
         req_file = '%s/%s/require' % (COMMON_RECIPES_DIR_NAME, self.recipe)
         requirements = []
@@ -144,7 +144,6 @@ class Recipe:
                     hostname=self.hostname,
                     username=self.username,
                     log=self.log)
-                recipe.set_logger(self.log)
                 for req in recipe.get_requirements():
                     requirements.append(req)
                 requirements.append(recipe)
@@ -242,7 +241,14 @@ def deploy(config_path, log):
             log.fatal('%s is undefined in %s' % (recipe_name, config_path))
         HOST_USER = environ.get('%s_USER' % recipe_name, 'root')
         recipe = Recipe(recipe_name, None, config_path, HOST_IP, HOST_USER, log)
-        recipe.set_logger(log)
+        for env in environ:
+            if env.startswith(recipe_name) and env != recipe_name:
+                # Properties aren't used anywhere internally. We only
+                # monitor them so hashes are generated properly. That
+                # said, if a recipe-name-related environment variable
+                # changes, we should assume a level of relevancy at
+                # the recipe level.
+                recipe.set_property(env, environ.get(env))
         recipes.add_recipes(recipe.get_requirements())
         recipes.add_recipe(recipe)
 
