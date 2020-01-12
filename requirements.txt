@@ -1,0 +1,4 @@
+paramiko
+requests
+python-dotenv
+scp
