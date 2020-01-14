@@ -57,7 +57,7 @@ class SSH:
         self.recipe_name = recipe_name
         self.client = client
         self.log = log
-    def exec(self, *args, bail_on_failure=True, show_command=True, show_output=True, show_error=True):
+    def execute(self, *args, bail_on_failure=True, show_command=True, show_output=True, show_error=True):
         cmd = ' '.join(args)
         if show_command:
             self.log.info('Running', cmd)
@@ -160,7 +160,7 @@ class Recipe:
         ssh = SSH(self.recipe, client, self.log)
 
         if self._type == self.Type.DEFINED:
-            ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
+            ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
 
             scp = SCPClient(client.get_transport())
             scp.put('%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
@@ -169,16 +169,16 @@ class Recipe:
 
         try:
             if self._type == self.Type.VIRTUAL:
-                ssh.exec(self.command)
+                ssh.execute(self.command)
             elif self._type == self.Type.DEFINED:
-                ssh.exec('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
+                ssh.execute('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
             passed = True
         except Exception:
             passed = False
         finally:
             if self._type == self.Type.DEFINED:
                 self.log.info('Deleting /opt/%s from remote host' % self.recipe)
-                ssh.exec('rm -rf /opt/%s' % self.recipe, show_command=False)
+                ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
 
         if not passed:
             self.log.fatal('Failed to deploy %s' % self.recipe)
@@ -301,7 +301,7 @@ def handle_configs(config_names):
     for config_name in config_names:
         handle_config(config_name)
     
-if __name__ == '__main__':
+def main():
     parser = ArgumentParser()
     parser.add_argument(
         '-c',
@@ -313,3 +313,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     handle_configs(args.configs)
     
+if __name__ == '__main__':
+    main()
