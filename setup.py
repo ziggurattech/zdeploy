@@ -18,10 +18,14 @@ class Installer(install):
 
 setup(
         name=__PROG_NAME__,
+        version='1.0.0',
+        license=open('LICENSE').read(),
         url='https://github.com/ziggurattech/%s' % __PROG_NAME__,
         author='Fadi Hanna Al-Kass',
+        author_email='f_alkass@zgps.live',
         description='General-purpose host deployment utility',
         long_description=open('README.md').read(),
+        keywords='deployment automation framework',
         cmdclass={'install': Installer},
         install_requires=open('requirements.txt').read().split('\n'),
 )
