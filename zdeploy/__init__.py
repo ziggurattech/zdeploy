@@ -1,293 +1,15 @@
-#!/usr/bin/python3
-
 from argparse import ArgumentParser
-from os import listdir, makedirs, environ
-from os.path import isdir, isfile
-from shutil import rmtree
-from datetime import datetime
-from dotenv import load_dotenv
-import paramiko
-from paramiko import SSHClient, AutoAddPolicy
+from os.path import isdir
+from os import listdir, makedirs
 from sys import stdout
-from scp import SCPClient
-from hashlib import md5
-from json import loads
+from datetime import datetime
+from zdeploy.log import Log
+from zdeploy.app import deploy
+from zdeploy.config import load as load_config
 
-config = {}
-if isfile('./config.json'):
-    config = loads(open('./config.json').read())
-
-COMMON_CONFIGS_DIR_NAME = config.get('configs', 'configs')
-COMMON_RECIPES_DIR_NAME = config.get('recipes', 'recipes')
-COMMON_HISTORY_DIR_NAME = config.get('history', 'history')
-COMMON_LOG_DIR_NAME = config.get('log', 'log')
-COMMON_INSTALLER = config.get('installer', 'apt-get install -y')
-
-class Log:
-    def __init__(self, *loggers):
-        self.loggers = list(loggers)
-    def register_logger(self, logger):
-        self.loggers.append(logger)
-    def register_loggers(self, loggers):
-        for logger in loggers:
-            self.register_logger(logger)
-    def write(self, *args):
-        message = ' '.join(args)
-        for logger in self.loggers:
-            logger.write('%s\n' % message)
-    def fatal(self, *args):
-        self.fail(*args)
-        exit(1)
-    def fail(self, *args):
-        self.write('\033[0;31m', *args, '\033[0;00m')
-    def warn(self, *args):
-        self.write('\033[1;33m', *args, '\033[0;00m')
-    def success(self, *args):
-        self.write('\033[0;32m', *args, '\033[0;00m')
-    def info(self, *args):
-        self.write('\033[1;35m', *args, '\033[0;00m')
-    def close(self):
-        for logger in self.loggers:
-            logger.close()
-    def __del__(self):
-        self.close()
-
-class SSH:
-    def __init__(self, recipe_name, client, log):
-        self.recipe_name = recipe_name
-        self.client = client
-        self.log = log
-    def execute(self, *args, bail_on_failure=True, show_command=True, show_output=True, show_error=True):
-        cmd = ' '.join(args)
-        if show_command:
-            self.log.info('Running', cmd)
-        _, stdout, _ = self.client.exec_command('%s 2>&1' % cmd)
-        if show_output:
-            for line in stdout:
-                self.log.info('%s: %s' % (self.recipe_name, line.rstrip()))
-        rc = stdout.channel.recv_exit_status()
-        if rc is not 0:
-            if show_error:
-                self.log.fail("Failed to run '%s'. Exit code: %d" % (cmd, rc))
-            if bail_on_failure:
-                raise Exception('%s failed to run' % cmd)
-        return rc
-class Recipe:
-    class Type:
-        DEFINED = 1
-        VIRTUAL = 2
-    def __init__(self, recipe, parent_recipe, config, hostname, username, log):
-        self.log = log
-        if not config or not len(config.strip()):
-            self.log.fatal('Invalid value for config')
-        if not recipe or not len(recipe.strip()):
-            self.log.fatal('Invalid value for recipe')
-        if not hostname or not len(hostname.strip()):
-            self.log.fatal('Invalid value for hostname')
-        self.parent_recipe = parent_recipe
-        self.set_recipe_name_and_type(recipe)
-        self.config = config
-        self.hostname = hostname
-        self.username = username
-        self.properties = {}
-    def set_property(self, key, value):
-        self.properties[key] = value
-    def set_recipe_name_and_type(self, recipe):
-        for r in listdir(COMMON_RECIPES_DIR_NAME):
-            if recipe.lower() == r.lower():
-                self.recipe = r
-                if self.parent_recipe == r:
-                    # Recipe references itself
-                    self.log.fatal('Invalid recipe: %s references itself' % r)
-                else:
-                    self._type = self.Type.DEFINED
-                return
-        self.recipe = recipe
-        self._type = self.Type.VIRTUAL
-        self.command = '%s %s' % (COMMON_INSTALLER, recipe)
-    def __str__(self):
-        return '%s -> %s:%s :: %s' % (self.recipe, self.username, self.hostname, self.properties)
-    def get_name(self):
-        return self.recipe
-    def __hash__(self):
-        return hash(str(self))
-    def __eq__(self, other):
-        return hash(self) == hash(other)
-    def get_deep_hash(self, dir_path=None):
-        hashes = ''
-        if self._type == self.Type.VIRTUAL:
-            hashes = md5(self.recipe.encode()).hexdigest()
-        elif self._type == self.Type.DEFINED:
-            if dir_path is None:
-                dir_path = '%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe)
-            for recipe in self.get_requirements():
-                hashes += recipe.get_deep_hash()
-            hashes += md5(str(self).encode()).hexdigest()
-            for node in listdir(dir_path):
-                rel_path = '%s/%s' % (dir_path, node)
-                if isfile(rel_path):
-                    file_hash = md5(open(rel_path).read().encode()).hexdigest()
-                    hashes += file_hash
-                elif isdir(rel_path):
-                    hashes += self.get_deep_hash(rel_path)
-        return md5(hashes.encode()).hexdigest()
-    def get_requirements(self):
-        req_file = '%s/%s/require' % (COMMON_RECIPES_DIR_NAME, self.recipe)
-        requirements = []
-        if isfile(req_file):
-            for requirement in open(req_file).read().split('\n'):
-                requirement = requirement.strip()
-                if requirement == '' or requirement.startswith('#'):
-                    continue
-                recipe = Recipe(
-                    recipe=requirement,
-                    parent_recipe=self.recipe,
-                    config=self.config,
-                    hostname=self.hostname,
-                    username=self.username,
-                    log=self.log)
-                for req in recipe.get_requirements():
-                    requirements.append(req)
-                requirements.append(recipe)
-        return requirements
-    def deploy(self):
-        self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
-        client = SSHClient()
-        client.load_system_host_keys()
-        client.set_missing_host_key_policy(AutoAddPolicy())
-        client.connect(hostname=self.hostname, port=22, username=self.username)
-
-        ssh = SSH(self.recipe, client, self.log)
-
-        if self._type == self.Type.DEFINED:
-            ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
-
-            scp = SCPClient(client.get_transport())
-            scp.put('%s/%s' % (COMMON_RECIPES_DIR_NAME, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
-            scp.put(self.config, remote_path='/opt/%s/config' % self.recipe)
-            scp.close()
-
-        try:
-            if self._type == self.Type.VIRTUAL:
-                ssh.execute(self.command)
-            elif self._type == self.Type.DEFINED:
-                ssh.execute('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
-            passed = True
-        except Exception:
-            passed = False
-        finally:
-            if self._type == self.Type.DEFINED:
-                self.log.info('Deleting /opt/%s from remote host' % self.recipe)
-                ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
-
-        if not passed:
-            self.log.fatal('Failed to deploy %s' % self.recipe)
-        self.log.success('Done with %s' % self.recipe)
-
-        client.close()
-
-class RecipeProcessor:
-    recipes = []
-    def __init__(self):
-        pass
-    def set_logger(self, log):
-        self.log = log
-    def add_recipes(self, recipes):
-        for recipe in recipes:
-            self.add_recipe(recipe)
-    def add_recipe(self, recipe):
-        if recipe in self.recipes:
-            self.log.warn('%s already added to recipes. Skipping...' % recipe.get_name())
-            return
-        self.log.info('Adding %s to recipes list' % recipe.get_name())
-        self.recipes.append(recipe)
-
-        if recipe._type == Recipe.Type.VIRTUAL:
-            self.log.warn("Recipe %s doesn't correspond to anything defined under the %s directory" % (recipe.recipe, COMMON_RECIPES_DIR_NAME))
-            self.log.warn('%s will be marked virtual and execute as %s' % (recipe.recipe, recipe.command))
-            self.log.warn('If you want to use a different package manager, add an "installer" field to your config.json file')
-    def get_hash(self):
-        return md5(' '.join([str(recipe) for recipe in self.recipes]).encode()).hexdigest()
-    def __iter__(self):
-        return iter(self.recipes)
-
-def deploy(config_path, history_dir_path, log):
-    log.info('Config file:', config_path)
-
-    load_dotenv(config_path)
-
-    recipes = RecipeProcessor()
-    recipes.set_logger(log)
-
-    recipe_names = environ.get('RECIPES')
-    if recipe_names.startswith('(') and recipe_names.endswith(')'):
-        recipe_names = recipe_names[1:-1]
-    for recipe_name in recipe_names.split(' '):
-        recipe_name = recipe_name.strip()
-        HOST_IP = environ.get(recipe_name)
-        if HOST_IP is None:
-            log.fatal('%s is undefined in %s' % (recipe_name, config_path))
-        HOST_USER = environ.get('%s_USER' % recipe_name, 'root')
-        recipe = Recipe(recipe_name, None, config_path, HOST_IP, HOST_USER, log)
-        for env in environ:
-            if env.startswith(recipe_name) and env != recipe_name:
-                # Properties aren't used anywhere internally. We only
-                # monitor them so hashes are generated properly. That
-                # said, if a recipe-name-related environment variable
-                # changes, we should assume a level of relevancy at
-                # the recipe level.
-                recipe.set_property(env, environ.get(env))
-        recipes.add_recipes(recipe.get_requirements())
-        recipes.add_recipe(recipe)
-
-    started_all = datetime.now()
-    log.info('Started %s deployment at %s on %s' % 
-        (config_path,
-        started_all.strftime('%H:%M:%S'),
-        started_all.strftime('%Y-%m-%d')))
-    deployment_history_path = '%s/%s' % (history_dir_path, recipes.get_hash())
-    if not isdir(deployment_history_path):
-        makedirs(deployment_history_path)
-    for dir in listdir(history_dir_path):
-        # Delete all stale history tracks so we don't run into issues
-        # when reverting deployments.
-        dir = '%s/%s' % (history_dir_path, dir)
-        if dir != deployment_history_path:
-            log.info('Deleting %s' % dir)
-            rmtree(dir)
-    for recipe in recipes:
-        recipe_history_path = '%s/%s' % (deployment_history_path, recipe.get_name())
-        if isfile(recipe_history_path) and recipe.get_deep_hash() in open(recipe_history_path, 'r').read():
-            log.warn('%s already deployed. Skipping...' % recipe.get_name())
-            continue
-        started_recipe = datetime.now()
-        log.info('Started %s recipe deployment at %s on %s' %
-            (recipe.get_name(),
-            started_recipe.strftime('%H:%M:%S'),
-            started_all.strftime('%Y-%m-%d')))
-        recipe.deploy()
-        ended_recipe = datetime.now()
-        log.info('Ended %s recipe deployment at %s on %s' %
-        (recipe.get_name(),
-        ended_recipe.strftime('%H:%M:%S'),
-        started_all.strftime('%Y-%m-%d')))
-        total_recipe_time = ended_recipe - started_recipe
-        log.success('%s finished in %s' % (recipe.get_name(), total_recipe_time))
-        open(recipe_history_path, 'w').write(recipe.get_deep_hash())
-    ended_all = datetime.now()
-    total_deployment_time = ended_all - started_all
-    log.info('Ended %s deployment at %s on %s' %
-        (config_path,
-        ended_all.strftime('%H:%M:%S'),
-        started_all.strftime('%Y-%m-%d')))
-    log.success('%s finished in %s' % (config_path, total_deployment_time))
-    log.info('Deployment hash is %s' % recipes.get_hash())
-    log.info('Delete %s to to enforce redeployment' % deployment_history_path)
-    log.info('Delete specific files from %s to enforce partial redeployment' % deployment_history_path)
-
-def handle_config(config_name):
-    log_dir_path = '%s/%s' % (COMMON_LOG_DIR_NAME, config_name)
-    history_dir_path = '%s/%s' % (COMMON_HISTORY_DIR_NAME, config_name)
+def handle_config(config_name, cfg):
+    log_dir_path = '%s/%s' % (cfg.logs, config_name)
+    history_dir_path = '%s/%s' % (cfg.history, config_name)
     if not isdir(log_dir_path):
         makedirs(log_dir_path)
     if not isdir(history_dir_path):
@@ -295,23 +17,23 @@ def handle_config(config_name):
     log = Log()
     log.register_logger(stdout)
     log.register_logger(open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w'))
-    deploy('%s/%s' % (COMMON_CONFIGS_DIR_NAME, config_name), history_dir_path, log)
+    deploy(config_name, history_dir_path, log, cfg)
 
-def handle_configs(config_names):
+def handle_configs(config_names, cfg):
     for config_name in config_names:
-        handle_config(config_name)
-    
+        handle_config(config_name, cfg)
+
 def main():
+    # Default config file name is config.json, so it needs not be specified
+	# in our case.
+    cfg = load_config()
     parser = ArgumentParser()
     parser.add_argument(
         '-c',
         '--configs',
-        help='Deploy to one or more configs in a staged order',
+        help='Deployment destination(s)',
         nargs='+',
         required=True,
-        choices=listdir(COMMON_CONFIGS_DIR_NAME) if isdir(COMMON_CONFIGS_DIR_NAME) else ())
+        choices=listdir(cfg.configs) if isdir(cfg.configs) else ())
     args = parser.parse_args()
-    handle_configs(args.configs)
-    
-if __name__ == '__main__':
-    main()
+    handle_configs(args.configs, cfg)
