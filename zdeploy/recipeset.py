@@ -3,9 +3,8 @@ from zdeploy.recipe import Recipe
 
 class RecipeSet:
     recipes = []
-    def __init__(self, cfg):
+    def __init__(self, cfg, log):
         self.cfg = cfg
-    def set_logger(self, log):
         self.log = log
     def add_recipes(self, recipes):
         for recipe in recipes:

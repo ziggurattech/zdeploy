@@ -11,8 +11,7 @@ def deploy(config_name, history_dir_path, log, cfg):
     print('Config:', config_path)
     load_dotenv(config_path)
 
-    recipes = RecipeSet(cfg)
-    recipes.set_logger(log)
+    recipes = RecipeSet(cfg, log)
 
     recipe_names = environ.get('RECIPES')
     if recipe_names.startswith('(') and recipe_names.endswith(')'):
