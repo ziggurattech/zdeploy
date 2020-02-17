@@ -1,10 +1,12 @@
 from paramiko import SSHClient, AutoAddPolicy
 
 class SSH(SSHClient):
-    def set_recipe(self, recipe_name):
+    def __init__(self, recipe_name, log):
+        SSHClient.__init__(self)
+        self.load_system_host_keys()
+        self.set_missing_host_key_policy(AutoAddPolicy())
         self.recipe_name = recipe_name
-    def set_logger(self, logger):
-        self.log = logger
+        self.log = log
     def execute(self, *args, bail_on_failure=True, show_command=True, show_output=True, show_error=True):
         cmd = ' '.join(args)
         if show_command:

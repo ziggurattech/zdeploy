@@ -3,7 +3,6 @@ from os.path import isdir, isfile
 from datetime import datetime
 from scp import SCPClient
 from hashlib import md5
-from paramiko import AutoAddPolicy
 from zdeploy.clients import SSH
 
 class Recipe:
@@ -88,11 +87,7 @@ class Recipe:
         return requirements
     def deploy(self):
         self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
-        ssh = SSH()
-        ssh.set_recipe(self.recipe)
-        ssh.set_logger(self.log)
-        ssh.load_system_host_keys()
-        ssh.set_missing_host_key_policy(AutoAddPolicy())
+        ssh = SSH(self.recipe, self.log)
         ssh.connect(hostname=self.hostname, port=22, username=self.username)
 
         if self._type == self.Type.DEFINED:
