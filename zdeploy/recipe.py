@@ -87,8 +87,7 @@ class Recipe:
         return requirements
     def deploy(self):
         self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
-        ssh = SSH(self.recipe, self.log)
-        ssh.connect(hostname=self.hostname, port=22, username=self.username)
+        ssh = SSH(recipe=self.recipe, log=self.log, hostname=self.hostname, username=self.username)
 
         if self._type == self.Type.DEFINED:
             ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
