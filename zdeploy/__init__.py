@@ -24,8 +24,7 @@ def handle_configs(config_names, cfg):
         handle_config(config_name, cfg)
 
 def main():
-    # Default config file name is config.json, so it needs not be specified
-	# in our case.
+    # Default config file name is config.json, so it needs not be specified in our case.
     cfg = load_config()
     parser = ArgumentParser()
     parser.add_argument(
