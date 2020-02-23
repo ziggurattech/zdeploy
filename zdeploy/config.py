@@ -17,6 +17,6 @@ def load(cfg_path = 'config.json'):
 	cfg['logs'] = cfg.get('logs', 'logs')
 	cfg['installer'] = cfg.get('installer', 'apt-get install -y')
 
-	# The following allows us to use the dot notation to reference the fields, e.g.:
-	# cfg.logs instead of cfg['logs']
+	# Turn cfg into a class allowing us to reference all the field via the dot operator,
+	# e.g.: cfg.logs instead of cfg['logs']
 	return type('', (), cfg)

@@ -1,4 +1,5 @@
 from paramiko import SSHClient, AutoAddPolicy
+from scp import SCPClient
 
 class SSH(SSHClient):
     def __init__(self, recipe, log, hostname, username):
@@ -8,6 +9,11 @@ class SSH(SSHClient):
         self.connect(hostname=hostname, port=22, username=username)
         self.recipe = recipe
         self.log = log
+    def __del__(self):
+        '''
+        Auto close connection
+        '''
+        self.close()
     def execute(self, *args, bail_on_failure=True, show_command=True, show_output=True, show_error=True):
         cmd = ' '.join(args)
         if show_command:
@@ -23,3 +29,14 @@ class SSH(SSHClient):
             if bail_on_failure:
                 raise Exception('%s failed to run' % cmd)
         return rc
+
+class SCP(SCPClient):
+    def __init__(self, transport):
+        SCPClient.__init__(self, transport)
+    def __del__(self):
+        '''
+        Auto close connection
+        '''
+        self.close()
+    def upload(self, src, dest):
+        pass

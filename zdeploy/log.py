@@ -1,4 +1,12 @@
 class Log:
+    '''
+    Log is a generic logging class that can write to anything with
+    a `write` function. The recommended use of this class is to log
+    to the standard output (stdout) and to a file, e.g.:
+    logger = Log()
+    logger.register_logger(sys.stdout)
+    logger.register_logger(open('mylog.log', 'w'))
+    '''
     def __init__(self, *loggers):
         self.loggers = list(loggers)
     def register_logger(self, logger):

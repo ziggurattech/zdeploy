@@ -1,9 +1,8 @@
 from os import listdir
 from os.path import isdir, isfile
 from datetime import datetime
-from scp import SCPClient
 from hashlib import md5
-from zdeploy.clients import SSH
+from zdeploy.clients import SSH, SCP
 
 class Recipe:
     class Type:
@@ -38,7 +37,6 @@ class Recipe:
                 return
         self.recipe = recipe
         self._type = self.Type.VIRTUAL
-        self.command = '%s %s' % (self.cfg.installer, recipe)
     def __str__(self):
         return '%s -> %s:%s :: %s' % (self.recipe, self.username, self.hostname, self.properties)
     def get_name(self):
@@ -92,14 +90,13 @@ class Recipe:
         if self._type == self.Type.DEFINED:
             ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
 
-            scp = SCPClient(ssh.get_transport())
+            scp = SCP(ssh.get_transport())
             scp.put('%s/%s' % (self.cfg.recipes, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
             scp.put(self.config, remote_path='/opt/%s/config' % self.recipe)
-            scp.close()
 
         try:
             if self._type == self.Type.VIRTUAL:
-                ssh.execute(self.command)
+                ssh.execute('%s %s' % (self.cfg.installer, self.recipe))
             elif self._type == self.Type.DEFINED:
                 ssh.execute('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
             passed = True
@@ -113,5 +110,3 @@ class Recipe:
         if not passed:
             self.log.fatal('Failed to deploy %s' % self.recipe)
         self.log.success('Done with %s' % self.recipe)
-
-        ssh.close()

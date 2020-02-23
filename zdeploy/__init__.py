@@ -8,6 +8,7 @@ from zdeploy.app import deploy
 from zdeploy.config import load as load_config
 
 def handle_config(config_name, cfg):
+    # TODO: document
     log_dir_path = '%s/%s' % (cfg.logs, config_name)
     history_dir_path = '%s/%s' % (cfg.history, config_name)
     if not isdir(log_dir_path):
@@ -20,6 +21,9 @@ def handle_config(config_name, cfg):
     deploy(config_name, history_dir_path, log, cfg)
 
 def handle_configs(config_names, cfg):
+    '''
+    Iterate over all retrieved configs and deploy them in a pipelined order.
+    '''
     for config_name in config_names:
         handle_config(config_name, cfg)
 
