@@ -13,7 +13,7 @@ def load(cfg_path = 'config.json'):
 	# Set defaults
 	cfg['configs'] = cfg.get('configs', 'configs')
 	cfg['recipes'] = cfg.get('recipes', 'recipes')
-	cfg['history'] = cfg.get('history', 'history')
+	cfg['cache'] = cfg.get('cache', 'cache')
 	cfg['logs'] = cfg.get('logs', 'logs')
 	cfg['installer'] = cfg.get('installer', 'apt-get install -y')
 

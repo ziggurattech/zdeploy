@@ -25,7 +25,7 @@ class RecipeSet:
     def get_hash(self):
         '''
         Return an MD5 hash out of the hash of all recipes combined.
-        The end result is used to create a cache direcory under deployments history.
+        The end result is used to create a cache direcory under deployments cache.
         '''
         return md5(' '.join([str(recipe) for recipe in self.recipes]).encode()).hexdigest()
     def __iter__(self):

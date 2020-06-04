@@ -10,15 +10,15 @@ from zdeploy.config import load as load_config
 def handle_config(config_name, cfg):
     # TODO: document
     log_dir_path = '%s/%s' % (cfg.logs, config_name)
-    history_dir_path = '%s/%s' % (cfg.history, config_name)
+    cache_dir_path = '%s/%s' % (cfg.cache, config_name)
     if not isdir(log_dir_path):
         makedirs(log_dir_path)
-    if not isdir(history_dir_path):
-        makedirs(history_dir_path)
+    if not isdir(cache_dir_path):
+        makedirs(cache_dir_path)
     log = Log()
     log.register_logger(stdout)
     log.register_logger(open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w'))
-    deploy(config_name, history_dir_path, log, cfg)
+    deploy(config_name, cache_dir_path, log, cfg)
 
 def handle_configs(config_names, cfg):
     '''
