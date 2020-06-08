@@ -23,7 +23,7 @@ class SSH(SSHClient):
             for line in stdout:
                 self.log.info('%s: %s' % (self.recipe, line.rstrip()))
         rc = stdout.channel.recv_exit_status()
-        if rc is not 0:
+        if rc != 0:
             if show_error:
                 self.log.fail("Failed to run '%s'. Exit code: %d" % (cmd, rc))
             if bail_on_failure:
