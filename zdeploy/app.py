@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from zdeploy.recipe import Recipe
 from zdeploy.recipeset import RecipeSet
 
-def deploy(config_name, cache_dir_path, log, cfg):
+def deploy(config_name, cache_dir_path, log, args, cfg):
     config_path = '%s/%s' % (cfg.configs, config_name)
     print('Config:', config_path)
     load_dotenv(config_path)
@@ -51,7 +51,7 @@ def deploy(config_name, cache_dir_path, log, cfg):
             rmtree(dir)
     for recipe in recipes:
         recipe_cache_path = '%s/%s' % (deployment_cache_path, recipe.get_name())
-        if isfile(recipe_cache_path) and recipe.get_deep_hash() in open(recipe_cache_path, 'r').read():
+        if isfile(recipe_cache_path) and recipe.get_deep_hash() in open(recipe_cache_path, 'r').read() and not args.force:
             log.warn('%s already deployed. Skipping...' % recipe.get_name())
             continue
         started_recipe = datetime.now()
@@ -76,5 +76,3 @@ def deploy(config_name, cache_dir_path, log, cfg):
         started_all.strftime('%Y-%m-%d')))
     log.success('%s finished in %s' % (config_path, total_deployment_time))
     log.info('Deployment hash is %s' % recipes.get_hash())
-    log.info('Delete %s to to enforce redeployment' % deployment_cache_path)
-    log.info('Delete specific files from %s to enforce partial redeployment' % deployment_cache_path)

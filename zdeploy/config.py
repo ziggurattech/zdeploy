@@ -16,6 +16,7 @@ def load(cfg_path = 'config.json'):
 	cfg['cache'] = cfg.get('cache', 'cache')
 	cfg['logs'] = cfg.get('logs', 'logs')
 	cfg['installer'] = cfg.get('installer', 'apt-get install -y')
+	cfg['force'] = cfg.get('force', 'no')
 
 	# Turn cfg into a class allowing us to reference all the field via the dot operator,
 	# e.g.: cfg.logs instead of cfg['logs']
