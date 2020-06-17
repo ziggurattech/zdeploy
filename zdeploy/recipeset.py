@@ -14,7 +14,7 @@ class RecipeSet:
             self.add_recipe(recipe)
     def add_recipe(self, recipe):
         if recipe in self.recipes:
-            self.log.warn('%s already added to recipes. Skipping...' % recipe.get_name())
+            self.log.warn('%s is already added to recipes. Skipping...' % recipe.get_name())
             return
         self.log.info('Adding %s to recipes list' % recipe.get_name())
         self.recipes.append(recipe)

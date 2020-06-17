@@ -52,7 +52,7 @@ def deploy(config_name, cache_dir_path, log, args, cfg):
     for recipe in recipes:
         recipe_cache_path = '%s/%s' % (deployment_cache_path, recipe.get_name())
         if isfile(recipe_cache_path) and recipe.get_deep_hash() in open(recipe_cache_path, 'r').read() and not args.force:
-            log.warn('%s already deployed. Skipping...' % recipe.get_name())
+            log.warn('%s is already deployed. Skipping...' % recipe.get_name())
             continue
         started_recipe = datetime.now()
         log.info('Started %s recipe deployment at %s on %s' %
