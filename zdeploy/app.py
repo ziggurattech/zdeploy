@@ -5,6 +5,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from zdeploy.recipe import Recipe
 from zdeploy.recipeset import RecipeSet
+from zdeploy.utils import reformat_time
 
 def deploy(config_name, cache_dir_path, log, args, cfg):
     config_path = '%s/%s' % (cfg.configs, config_name)
@@ -66,7 +67,7 @@ def deploy(config_name, cache_dir_path, log, args, cfg):
         ended_recipe.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
         total_recipe_time = ended_recipe - started_recipe
-        log.success('%s finished in %s' % (recipe.get_name(), total_recipe_time))
+        log.success('%s finished in %s' % (recipe.get_name(), reformat_time(total_recipe_time)))
         open(recipe_cache_path, 'w').write(recipe.get_deep_hash())
     ended_all = datetime.now()
     total_deployment_time = ended_all - started_all
@@ -74,5 +75,5 @@ def deploy(config_name, cache_dir_path, log, args, cfg):
         (config_path,
         ended_all.strftime('%H:%M:%S'),
         started_all.strftime('%Y-%m-%d')))
-    log.success('%s finished in %s' % (config_path, total_deployment_time))
+    log.success('%s finished in %s' % (config_path, reformat_time(total_deployment_time)))
     log.info('Deployment hash is %s' % recipes.get_hash())
