@@ -4,10 +4,11 @@ import sys, os, stat
 from shutil import copyfile
 
 __PROG_NAME__ = 'zdeploy'
+__VERSION__ = '1.0.0'
 
 setup(
         name=__PROG_NAME__,
-        version='1.0.0',
+        version=__VERSION__,
         license=open('LICENSE').read(),
         url='https://github.com/ziggurattech/%s' % __PROG_NAME__,
         author='Fadi Hanna Al-Kass',
