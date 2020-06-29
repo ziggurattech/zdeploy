@@ -1,35 +1,96 @@
 # zdeploy
-[zdeploy](https://github.com/ziggurattech/zdeploy) is [ZigguratTech](http://ziggurat.tech)'s official deployment utility. We're currently using the tool to deploy the entire [ZGPS.live](https://zgps.live) stack.
+[zdeploy](https://github.com/ziggurattech/zdeploy) is [ZigguratTech](http://ziggurat.tech)'s official deployment utility. We are currently using the tool to deploy the entire [ZGPS.live](https://zgps.live) stack.
 
-Imagine wanting to deploy a [Postgres](#) [Docker](#) instance via [docker-compose](#). If you're going to do this manually, you'd normally install Docker first, then docker-compose, and then deploy your desired Postgres instance. If you're using a Bash script for the task, you probably have the entire procedure layed out in a single script. This is fine until you find out you need to deploy other things like a Redis instance for example. You're now either obligated to append to that one script you've maintained, or <b>if you like to keep it clean</b>, you'd consider splitting the Docker to docker-compose to Postgres script into three separate scripts and run them consecutivly once for the Postgres instance and once again for Redis (because hey, how would your script know Docker and docker-compose are already present on the host before attempting to deploy Redis?). You have it all sorted out, and then you find out not only do you have to deploy the two instances on different hosts, but you also have deploy a single config file to a third host with the access info and login credentials of the two instances. You see how maintaining the legacy behavior becomes more painful over time, and now you get the point.
+Imagine wanting to deploy a [Postgres](https://www.postgresql.org) [Docker](https://www.docker.com) instance via [docker-compose](https://docs.docker.com/compose). If you are going to do this manually, you would normally install Docker first, then docker-compose, and then deploy your desired Postgres instance. If you are using a Bash script for the task, you probably have the entire procedure laid out in a single script. This is fine until you find out you need to deploy other things like a Redis instance for example. You are now either obligated to append to that one script you have maintained or <b>if you like to keep it clean</b>, you would consider splitting the Docker to docker-compose to Postgres script into three separate scripts and run them consecutively once for the Postgres instance and once again for Redis (because hey, how would your script know Docker and docker-compose are already present on the host before attempting to deploy Redis?). You have it all sorted out, and then you find out not only do you have to deploy the two instances on different hosts, but you also deploy a single config file to a third host with the access info and login credentials of the two instances. You see how maintaining the legacy behavior becomes more painful over time, and now you get the point.
 
 <b>So how does zdeploy solve the problem?</b>
 
 zdeploy utilizes two core concepts (`Recipes` and `Configs`).
 
-`Recipes` are modularized prodecures you can use to define the bits and pieces of your deployment process. Recipes tend to have a nature of dependency (A needing B, and B needing C). zdeploy uses a hashing mechanism to weed out duplication (A needing B and C, and both A and C needing X) to ensure deployments are always done the fastest way possible.
+`Recipes` are modularized procedures you can use to define the bits and pieces of your deployment process. Recipes tend to have a nature of dependency (A needing B, and B needing C). zdeploy uses a hashing mechanism to weed out duplication (A needing B and C, and both A and C needing X) to ensure deployments are always done the fastest way possible.
 
-`Configs` are envirounment variable files that define where recipes are executed.
+`Configs` are environment variable files that define <b>where</b> recipes are executed.
 
-use the following command to install zdeploy, and let's get down to business with a real-world deployment example.
+use the following command to install zdeploy, and let us get down to business with a real-world deployment example.
 
 ```
 $ pip3 install git+https://github.com/ziggurattech/zdeploy
 ```
 
-We're going to deploy Postgres and Redis in this walkthrough example. Find a place where you would like to specify your deployment process and follow along with me.
+Configuration directory structure:
+```
+Project Directory
+├─ config.json
+├─ configs directory
+├─ Recipes directory
+|  ├─ Recipe 1
+|  |   ├─ `run` script
+|  |   └─ `require` script
+|  ├─ Recipe 2
+|  |   ├─ `run` script
+|  |   └─ `require` script
+|  ├─ Recipe N
+|  |   ├─ `run` script
+|  |   └─ `require` script
+```
 
-* Create a deployment directory and redirect into it
+> Project directory title, config file names, and recipe names are arbitrary.
+
+> `config.json` is an <b>optional</b> config file used to modify the defaults. Some of the command-line argument defaults can be overwritten there too.
+
+> `run` serves as the entrypoint to every recipe.
+
+> `require` is a dependency file. The content of this file can be (1) other recipes, (2) system packages, or a combination of both. This file is cached to allow zdeploy to eliminate duplications across hosts. More on that in a bit.
+
+We will explore a premade sample to understand how all the parts fit together. Check out the [sample-zdeploy](https://github.com/ziggurattech/sample-zdeploy) repository (e.g. `git clone https://github.com/ziggurattech/sample-zdeploy`) and follow along.
+
+
+In sample-zdeploy we have three recipes (`fail2ban`, `docker`, and `redis`). All of these recipes are written in Bash, though they need not be. Your scripting options so unlimited you can even use your own domain-specific language!
+
+The `require` file in `docker` and `redis` defines their prerequisites. These prerequisites can be other recipes and/or system packages. You'll notice that we have `curl`,  `gnupg2`, `software-properties-common`, `ca-certificates`, and `lsb-release` in the `docker` recipe directory and `docker` in the `redis` recipe directory. The aforementioned list of packages will be installed using a default installer (this can be changed in `config.json` or via a CLI argument), because their names do not refer to actual recipe directory titles under our `recipes` directory, while the `docker` prerequisite refers to our `docker` recipe because we do have a directory with that title.
+
+The `dev.zgps.live` configuration file we have under the `configs` directory satisfies our 'where' constraints. We have packages, and this is the file that lets zdeploy know where to deploy them and in what order:
+
 
 ```
-$ mkdir mydeployment && cd mydeployment
+export RECIPES=(FAIL2BAN REDIS)
+
+export FAIL2BAN=track.zgps.live
+export REDIS=track.zgps.live
 ```
 
-> This will be the directory where all your recipes and configs reside.
+`RECIPES` is a special environment variable that takes a list of package names (all in upper-case) and deploys them in the order they are provided. We then define our host URLs/IPs by exporting them as environment variables as shown above.
 
-* Create a few recipes
+In this case, if we run `zdeploy -c dev.zgps.live` while at the project root directory, our `fail2ban` recipe will deploy first, then the `docker` recipe (because it's a prerequisite of `redis` which is defined next in `configs/dev.zgps.live`), then `redis` deploys last. The output will confirm this behavior.
 
-TBC
+## config.json
+`config.json` allows you to overwrite the defaults. While the defaults may suit your needs, it is highly recommended to maintain your own defaults in a config.json to avoid backward compatibility issues when working with future releases of zdeploy.
+
+Here is a sample config.json file:
+
+```json
+{
+	"logs": "artifacts/logs",
+	"cache": "artifacts/cache",
+	"recipes": "recipes",
+	"configs": "configs",
+	"force": "yes",
+	"installer": "pip install",
+}
+```
+
+And here is a list of all supported config parameters to date:
+
+| Parameter | Description                                                                                           | Required | Type   | Default            |
+|-----------|-------------------------------------------------------------------------------------------------------|----------|--------|--------------------|
+| configs   | Host configuration directory path                                                                     | No       | String | configs            |
+| recipes   | Recipes directory path                                                                                | No       | String | recipes            |
+| cache     | Deployment cache directory path                                                                       | No       | String | cache              |
+| logs      | Deployment logs directory path                                                                        | No       | String | logs               |
+| installer | Default installer, used when an unrecognized dependency is found in the `require` file                | No       | String | apt-get install -y |
+| force     | Force entire deployment every time (default is to pick up with a previous failing deployment left off | No       | String | no                 |
+
+> NOTE: This table will be updated to always support the most recent release of zdeploy. 
 
 ## Author
 [Fadi Hanna Al-Kass](https://github.com/alkass)
