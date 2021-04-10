@@ -58,7 +58,7 @@ class Recipe:
             for node in listdir(dir_path):
                 rel_path = '%s/%s' % (dir_path, node)
                 if isfile(rel_path):
-                    file_hash = md5(open(rel_path).read().encode()).hexdigest()
+                    file_hash = md5(open(rel_path, 'rb').read()).hexdigest()
                     hashes += file_hash
                 elif isdir(rel_path):
                     hashes += self.get_deep_hash(rel_path)
