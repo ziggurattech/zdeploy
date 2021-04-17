@@ -17,6 +17,8 @@ def load(cfg_path = 'config.json'):
 	cfg['logs'] = cfg.get('logs', 'logs')
 	cfg['installer'] = cfg.get('installer', 'apt-get install -y')
 	cfg['force'] = cfg.get('force', 'no')
+	cfg['user'] = cfg.get('user', 'root')
+	cfg['port'] = cfg.get('port', 22)
 
 	# Turn cfg into a class allowing us to reference all the field via the dot operator,
 	# e.g.: cfg.logs instead of cfg['logs']

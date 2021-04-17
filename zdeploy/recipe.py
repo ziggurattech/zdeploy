@@ -8,7 +8,7 @@ class Recipe:
     class Type:
         DEFINED = 1
         VIRTUAL = 2
-    def __init__(self, recipe, parent_recipe, config, hostname, username, log, cfg):
+    def __init__(self, recipe, parent_recipe, config, hostname, username, port, log, cfg):
         self.log = log
         if not config or not len(config.strip()):
             self.log.fatal('Invalid value for config')
@@ -16,6 +16,11 @@ class Recipe:
             self.log.fatal('Invalid value for recipe')
         if not hostname or not len(hostname.strip()):
             self.log.fatal('Invalid value for hostname')
+        try:
+            self.port = int(port)
+        except ValueError:
+            self.log.fatal('Invalid value for port: %s' % port)
+
         self.cfg = cfg
         self.parent_recipe = parent_recipe
         self.set_recipe_name_and_type(recipe)
@@ -38,7 +43,7 @@ class Recipe:
         self.recipe = recipe
         self._type = self.Type.VIRTUAL
     def __str__(self):
-        return '%s -> %s:%s :: %s' % (self.recipe, self.username, self.hostname, self.properties)
+        return '%s -> %s@%s:%d :: %s' % (self.recipe, self.username, self.hostname, self.port, self.properties)
     def get_name(self):
         return self.recipe
     def __hash__(self):
@@ -77,6 +82,7 @@ class Recipe:
                     config=self.config,
                     hostname=self.hostname,
                     username=self.username,
+                    port=self.port,
                     log=self.log,
                     cfg=self.cfg)
                 for req in recipe.get_requirements():
@@ -85,7 +91,7 @@ class Recipe:
         return requirements
     def deploy(self):
         self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
-        ssh = SSH(recipe=self.recipe, log=self.log, hostname=self.hostname, username=self.username)
+        ssh = SSH(recipe=self.recipe, log=self.log, hostname=self.hostname, username=self.username, port=self.port)
 
         if self._type == self.Type.DEFINED:
             ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
