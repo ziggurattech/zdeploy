@@ -64,7 +64,7 @@ export REDIS=track.zgps.live
 In this case, if we run `zdeploy -c dev.zgps.live` while at the project root directory, our `fail2ban` recipe will deploy first, then the `docker` recipe (because it's a prerequisite of `redis` which is defined next in `configs/dev.zgps.live`), then `redis` deploys last. The output will confirm this behavior.
 
 ## config.json
-`config.json` allows you to overwrite the defaults. While the defaults may suit your needs, it is highly recommended to maintain your own defaults in a config.json to avoid backward compatibility issues when working with future releases of Zdeploy.
+`config.json` allows you to overwrite the defaults. While the defaults may suit your needs, it is highly recommended to maintain your own defaults in a `config.json` to avoid backward compatibility issues when working with future releases of Zdeploy.
 
 Here is a sample config.json file:
 
@@ -90,7 +90,8 @@ And here is a list of all supported config parameters to date:
 | installer | Default installer, used when an unrecognized dependency is found in the `require` file                | No       | String  | apt-get install -y |
 | force     | Force entire deployment every time (default is to pick up with a previous failing deployment left off | No       | String  | no                 |
 | user      | Default username (used for recipes that don't specify a username, i.e. RECIPE_USER).                  | No       | String  | root               |
-| port      | Default port number (used for recipes that don't specify a port number, i.e. RECIPE_PORT).            | No       | integer | 22                 |
+| password  | Default password (used in case a private key isn't auto detected).                                    | No       | String  | None               |
+| port      | Default port number (used for recipes that don't specify a port number, i.e. RECIPE_PORT).            | No       | Integer | 22                 |
 
 > NOTE: This table will be updated to always support the most recent release of Zdeploy. 
 

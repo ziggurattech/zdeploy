@@ -8,7 +8,7 @@ class Recipe:
     class Type:
         DEFINED = 1
         VIRTUAL = 2
-    def __init__(self, recipe, parent_recipe, config, hostname, username, port, log, cfg):
+    def __init__(self, recipe, parent_recipe, config, hostname, username, password, port, log, cfg):
         self.log = log
         if not config or not len(config.strip()):
             self.log.fatal('Invalid value for config')
@@ -27,6 +27,7 @@ class Recipe:
         self.config = config
         self.hostname = hostname
         self.username = username
+        self.password = password
         self.properties = {}
     def set_property(self, key, value):
         self.properties[key] = value
@@ -82,6 +83,7 @@ class Recipe:
                     config=self.config,
                     hostname=self.hostname,
                     username=self.username,
+                    password=self.password,
                     port=self.port,
                     log=self.log,
                     cfg=self.cfg)
@@ -91,7 +93,12 @@ class Recipe:
         return requirements
     def deploy(self):
         self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
-        ssh = SSH(recipe=self.recipe, log=self.log, hostname=self.hostname, username=self.username, port=self.port)
+        ssh = SSH(recipe=self.recipe,
+            log=self.log,
+            hostname=self.hostname,
+            username=self.username,
+            password=self.password,
+            port=self.port)
 
         if self._type == self.Type.DEFINED:
             ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)

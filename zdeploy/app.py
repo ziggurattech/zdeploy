@@ -23,8 +23,9 @@ def deploy(config_name, cache_dir_path, log, args, cfg):
         if HOST_IP is None:
             log.fatal('%s is undefined in %s' % (recipe_name, config_path))
         HOST_USER = environ.get('%s_USER' % recipe_name, cfg.user)
+        HOST_PASSWORD = environ.get("%s_PASSWORD" % recipe_name, cfg.password)
         HOST_PORT = environ.get("%s_PORT" % recipe_name, cfg.port)
-        recipe = Recipe(recipe_name, None, config_path, HOST_IP, HOST_USER, HOST_PORT, log, cfg)
+        recipe = Recipe(recipe_name, None, config_path, HOST_IP, HOST_USER, HOST_PASSWORD, HOST_PORT, log, cfg)
         for env in environ:
             if env.startswith(recipe_name) and env != recipe_name:
                 # Properties aren't used anywhere internally. We only

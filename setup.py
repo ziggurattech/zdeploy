@@ -4,7 +4,7 @@ import sys, os, stat
 from shutil import copyfile
 
 __PROG_NAME__ = 'zdeploy'
-__VERSION__ = '1.1.0'
+__VERSION__ = '1.2.0'
 
 setup(
         name=__PROG_NAME__,

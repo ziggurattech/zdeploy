@@ -2,11 +2,11 @@ from paramiko import SSHClient, AutoAddPolicy
 from scp import SCPClient
 
 class SSH(SSHClient):
-    def __init__(self, recipe, log, hostname, username, port):
+    def __init__(self, recipe, log, hostname, username, password, port):
         SSHClient.__init__(self)
         self.load_system_host_keys()
         self.set_missing_host_key_policy(AutoAddPolicy())
-        self.connect(hostname=hostname, port=port, username=username)
+        self.connect(hostname=hostname, port=port, username=username, password=password)
         self.recipe = recipe
         self.log = log
     def __del__(self):
