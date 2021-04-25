@@ -3,6 +3,7 @@ from os.path import isdir, isfile
 from datetime import datetime
 from hashlib import md5
 from zdeploy.clients import SSH, SCP
+from zdeploy.shell import execute as shell_execute
 
 class Recipe:
     class Type:
@@ -58,6 +59,16 @@ class Recipe:
         elif self._type == self.Type.DEFINED:
             if dir_path is None:
                 dir_path = '%s/%s' % (self.cfg.recipes, self.recipe)
+
+                # Execute the hash script and copy its output into our hashes variable.
+                # NOTE: We perform this check specifically inside this block because when
+                # dir_path is None, we know we're at the main recipe directory path.
+                if isfile('%s/hash' % dir_path):
+                    cmd_out, cmd_rc = shell_execute("chmod +x %s/hash && bash %s && ./%s/hash" % (dir_path, self.config, dir_path))
+                    if cmd_rc != 0:
+                        raise Exception(cmd_out)
+                    hashes += cmd_out
+
             for recipe in self.get_requirements():
                 hashes += recipe.get_deep_hash()
             hashes += md5(str(self).encode()).hexdigest()
