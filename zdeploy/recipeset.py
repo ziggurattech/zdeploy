@@ -19,13 +19,13 @@ class RecipeSet:
         self.log.info('Adding %s to recipes list' % recipe.get_name())
         self.recipes.append(recipe)
         if recipe._type == Recipe.Type.VIRTUAL:
-            self.log.warn("Recipe %s doesn't correspond to anything defined under the %s directory" % (recipe.recipe, self.cfg.recipes))
+            self.log.warn("'%s' doesn't correspond to anything defined under the %s directory" % (recipe.recipe, self.cfg.recipes))
             self.log.warn('%s will be marked virtual and execute as %s %s' % (recipe.recipe, recipe.cfg.installer, recipe.recipe))
-            self.log.warn('If you want to use a different package manager, add an "installer" field to your config.json file')
+            self.log.warn("If you want to use a different package manager, add an 'installer' field to your config.json file")
     def get_hash(self):
         '''
         Return an MD5 hash out of the hash of all recipes combined.
-        The end result is used to create a cache direcory under deployments cache.
+        The end result is used to create a cache directory under deployments cache.
         '''
         return md5(' '.join([str(recipe) for recipe in self.recipes]).encode()).hexdigest()
     def __iter__(self):

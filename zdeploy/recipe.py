@@ -64,7 +64,7 @@ class Recipe:
                 # NOTE: We perform this check specifically inside this block because when
                 # dir_path is None, we know we're at the main recipe directory path.
                 if isfile('%s/hash' % dir_path):
-                    cmd_out, cmd_rc = shell_execute("chmod +x %s/hash && bash %s && ./%s/hash" % (dir_path, self.config, dir_path))
+                    cmd_out, cmd_rc = shell_execute('chmod +x %s/hash && bash %s && ./%s/hash' % (dir_path, self.config, dir_path))
                     if cmd_rc != 0:
                         raise Exception(cmd_out)
                     hashes += cmd_out
