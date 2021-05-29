@@ -122,7 +122,12 @@ class Recipe:
             if self._type == self.Type.VIRTUAL:
                 ssh.execute('%s %s' % (self.cfg.installer, self.recipe))
             elif self._type == self.Type.DEFINED:
-                ssh.execute('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
+                if not isfile('%s/%s/run' % (self.cfg.recipes, self.recipe)):
+                    # Recipes with no run file are acceptable since they (may) have a require file
+                    # and don't necessarily require the execution of anything of their own.
+                    self.log.warn("%s doesn't have a run file. Continuing..." % self.recipe)
+                else:
+                    ssh.execute('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
             passed = True
         except Exception:
             passed = False
