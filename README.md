@@ -1,7 +1,9 @@
+
+
 # Zdeploy
 [zdeploy](https://github.com/ziggurattech/zdeploy) is [ZigguratTech](http://ziggurat.tech)'s official deployment utility. We are currently using the tool to deploy the entire [ZGPS.live](https://zgps.live) stack.
 
-Imagine wanting to deploy a [Postgres](https://www.postgresql.org) [Docker](https://www.docker.com) instance via [docker-compose](https://docs.docker.com/compose). If you are going to do this manually, you would normally install Docker first, then docker-compose, and then deploy your desired Postgres instance. If you are using a Bash script for the task, you probably have the entire procedure laid out in a single script. This is fine until you find out you need to deploy other things like a Redis instance for example. You are now either obligated to append to that one script you have maintained or <b>if you like to keep it clean</b>, you would consider splitting the Docker to docker-compose to Postgres script into three separate scripts and run them consecutively once for the Postgres instance and once again for Redis (because hey, how would your script know Docker and docker-compose are already present on the host before attempting to deploy Redis?). You have it all sorted out, and then you find out not only do you have to deploy the two instances on different hosts, but you also deploy a single config file to a third host with the access info and login credentials of the two instances. You see how maintaining the legacy behavior becomes more painful over time, and now you get the point.
+Imagine wanting to deploy a [Postgres](https://www.postgresql.org) [Docker](https://www.docker.com) instance via [docker-compose](https://docs.docker.com/compose). If you are going to do this manually, you would normally install Docker first, then docker-compose, and then deploy your desired Postgres instance. If you are using a Bash script for the task, you probably have the entire procedure laid out in a single script. This is fine until you find out you need to deploy other things like a Redis instance for example. You are now either obligated to append to that one script you have maintained or <b>if you like to keep it clean</b>, you would consider splitting the Docker to docker-compose to Postgres script into three separate scripts and run them consecutively once for the Postgres instance and once again for Redis (because hey, how would your script know Docker and docker-compose are already present on the host before attempting to deploy Redis?). You have it all sorted out, and then you find out that not only do you have to deploy the two instances on different hosts, but you also deploy a single config file to a third host with the access info and login credentials of the two instances. You see how maintaining the legacy behavior becomes more painful over time, and now you get the point.
 
 <b>So how does Zdeploy solve the problem?</b>
 
@@ -79,7 +81,7 @@ Here is a sample config.json file:
 }
 ```
 
-And here is a list of all supported config parameters to date:
+Here is a list of all supported config parameters to date:
 
 | Parameter | Description                                                                                           | Required | Type    | Default            |
 |-----------|-------------------------------------------------------------------------------------------------------|----------|---------|--------------------|
@@ -90,7 +92,7 @@ And here is a list of all supported config parameters to date:
 | installer | Default installer, used when an unrecognized dependency is found in the `require` file                | No       | String  | apt-get install -y |
 | force     | Force entire deployment every time (default is to pick up with a previous failing deployment left off | No       | String  | no                 |
 | user      | Default username (used for recipes that don't specify a username, i.e. RECIPE_USER).                  | No       | String  | root               |
-| password  | Default password (used in case a private key isn't auto detected).                                    | No       | String  | None               |
+| password  | Default password (used in case a private key isn't auto-detected).                                    | No       | String  | None               |
 | port      | Default port number (used for recipes that don't specify a port number, i.e. RECIPE_PORT).            | No       | Integer | 22                 |
 
 > NOTE: This table will be updated to always support the most recent release of Zdeploy. 
