@@ -1,4 +1,6 @@
-
+<p align="center">
+  <img src="assets/img/icon.png" alt="Icon">
+</p>
 
 # Zdeploy
 [zdeploy](https://github.com/ziggurattech/zdeploy) is [ZigguratTech](http://ziggurat.tech)'s official deployment utility. We are currently using the tool to deploy the entire [ZGPS.live](https://zgps.live) stack.
