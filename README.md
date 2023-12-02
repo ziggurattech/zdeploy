@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/img/icon.png" alt="Icon">
+  <img src="assets/img/icon4.png" alt="Icon">
 </p>
 
 # Zdeploy
