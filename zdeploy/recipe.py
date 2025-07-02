@@ -31,11 +31,11 @@ class Recipe:
         """Initialize a recipe instance."""
 
         self.log = log
-        if not config or not len(config.strip()):
+        if not config or not config.strip():
             self.log.fatal("Invalid value for config")
-        if not recipe or not len(recipe.strip()):
+        if not recipe or not recipe.strip():
             self.log.fatal("Invalid value for recipe")
-        if not hostname or not len(hostname.strip()):
+        if not hostname or not hostname.strip():
             self.log.fatal("Invalid value for hostname")
         try:
             self.port = int(port)

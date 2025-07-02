@@ -76,12 +76,14 @@ def deploy(config_name, cache_dir_path, log, args, cfg):
             continue
         started_recipe = datetime.now()
         log.info(
-            f"Started {recipe.get_name()} recipe deployment at {started_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
+            f"Started {recipe.get_name()} recipe deployment at "
+            f"{started_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
         )
         recipe.deploy()
         ended_recipe = datetime.now()
         log.info(
-            f"Ended {recipe.get_name()} recipe deployment at {ended_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
+            f"Ended {recipe.get_name()} recipe deployment at "
+            f"{ended_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
         )
         total_recipe_time = ended_recipe - started_recipe
         log.success(

@@ -34,13 +34,22 @@ class RecipeSet:
         self.recipes.append(recipe)
         if recipe._type == Recipe.Type.VIRTUAL:
             self.log.warn(
-                f"'{recipe.recipe}' doesn't correspond to anything defined under the {self.cfg.recipes} directory"
+                (
+                    f"'{recipe.recipe}' doesn't correspond to anything defined "
+                    f"under the {self.cfg.recipes} directory"
+                )
             )
             self.log.warn(
-                f"this recipe will be marked virtual and execute as `{recipe.cfg.installer} {recipe.recipe}`"
+                (
+                    "this recipe will be marked virtual and execute as "
+                    f"`{recipe.cfg.installer} {recipe.recipe}`"
+                )
             )
             self.log.warn(
-                "If you want to use a different package manager, add an 'installer' field to the config.json file"
+                (
+                    "If you want to use a different package manager, add an "
+                    "'installer' field to the config.json file"
+                )
             )
 
     def get_hash(self):
