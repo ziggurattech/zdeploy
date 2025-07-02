@@ -6,20 +6,11 @@ from os.path import isdir
 from sys import stdout
 from datetime import datetime
 
+from zdeploy.utils import str2bool
+
 from zdeploy.log import Log
 from zdeploy.app import deploy
 from zdeploy.config import load as load_config, Config
-
-
-def str2bool(value: str | bool) -> bool:
-    """Return a boolean for common yes/no strings."""
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ("yes", "y"):
-        return True
-    if value.lower() in ("no", "n"):
-        return False
-    raise ValueError(f"Invalid value: {value}")
 
 
 def handle_config(config_name: str, args: Namespace, cfg: Config) -> None:

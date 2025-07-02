@@ -6,6 +6,8 @@ from json import loads
 from os.path import isfile
 from typing import Any, Dict, cast
 
+from zdeploy.utils import str2bool
+
 
 @dataclass  # pylint: disable=too-many-instance-attributes
 class Config:
@@ -16,7 +18,7 @@ class Config:
     cache: str = "cache"
     logs: str = "logs"
     installer: str = "apt-get install -y"
-    force: str = "no"
+    force: bool = False
     user: str = "root"
     password: str | None = None
     port: int = 22
@@ -47,7 +49,10 @@ def load(cfg_path: str = "config.json") -> Config:
     # Force is disabled by default. This sets the behavior to
     # only deploy undeployed recipes and/or pick up where a
     # previous deployment was halted or had crashed.
-    cfg["force"] = cfg.get("force", Config.force)
+    force_value = cfg.get("force", Config.force)
+    if isinstance(force_value, str):
+        force_value = str2bool(force_value)
+    cfg["force"] = force_value
 
     # Default username is root
     cfg["user"] = cfg.get("user", Config.user)

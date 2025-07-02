@@ -92,7 +92,7 @@ Here is a list of all supported config parameters to date:
 | cache     | Deployment cache directory path                                                                       | No       | String  | cache              |
 | logs      | Deployment logs directory path                                                                        | No       | String  | logs               |
 | installer | Default installer, used when an unrecognized dependency is found in the `require` file                | No       | String  | apt-get install -y |
-| force     | Force entire deployment every time (default is to pick up with a previous failing deployment left off | No       | String  | no                 |
+| force     | Force entire deployment every time (default is to pick up with a previous failing deployment left off | No       | Boolean | False              |
 | user      | Default username (used for recipes that don't specify a username, i.e. RECIPE_USER).                  | No       | String  | root               |
 | password  | Default password (used in case a private key isn't auto-detected).                                    | No       | String  | None               |
 | port      | Default port number (used for recipes that don't specify a port number, i.e. RECIPE_PORT).            | No       | Integer | 22                 |

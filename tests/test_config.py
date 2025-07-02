@@ -6,3 +6,4 @@ def test_load_defaults(tmp_path):
     assert cfg.recipes == 'recipes'
     assert cfg.cache == 'cache'
     assert cfg.logs == 'logs'
+    assert cfg.force is False
