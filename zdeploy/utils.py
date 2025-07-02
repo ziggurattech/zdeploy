@@ -2,18 +2,22 @@
 
 
 from datetime import timedelta
+from sys import stderr
 from typing import Union
 
 
 def str2bool(value: str) -> bool:
-    """Return ``True`` for 'yes' or 'y' and ``False`` for 'no' or 'n'."""
+    """Return ``True`` if ``value`` is a truthy string."""
 
     value = value.lower()
-    if value in ("yes", "y"):
+    if value in {"yes", "y", "true", "t", "e", "enable"}:
         return True
-    if value in ("no", "n"):
-        return False
-    raise ValueError(f"Invalid value: {value}")
+
+    print(
+        f"'{value}' is not a recognized true value; treating as False",
+        file=stderr,
+    )
+    return False
 
 
 def reformat_time(time: Union[str, timedelta]) -> str:
