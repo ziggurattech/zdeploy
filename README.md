@@ -97,7 +97,18 @@ Here is a list of all supported config parameters to date:
 | password  | Default password (used in case a private key isn't auto-detected).                                    | No       | String  | None               |
 | port      | Default port number (used for recipes that don't specify a port number, i.e. RECIPE_PORT).            | No       | Integer | 22                 |
 
-> NOTE: This table will be updated to always support the most recent release of Zdeploy. 
+> NOTE: This table will be updated to always support the most recent release of Zdeploy.
+
+## Development
+
+Install development tools and run lint, type checks, and the test suite:
+
+```bash
+pip install -r requirements.txt
+pylint zdeploy
+pyright zdeploy
+pytest
+```
 
 ## Author
 [Fadi Hanna Al-Kass](https://github.com/alkass)

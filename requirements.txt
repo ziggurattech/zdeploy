@@ -3,3 +3,6 @@ requests==2.32.4
 python-dotenv==1.1.1
 scp==0.15.0
 cryptography>=45.0.4 # not directly required, pinned to avoid a vulnerability
+pylint==3.3.7
+pytest==8.4.1
+pyright==1.1.402
