@@ -2,7 +2,7 @@
 # pylint: disable=too-many-instance-attributes,too-few-public-methods,too-many-arguments,too-many-positional-arguments
 
 from os import listdir
-from os.path import isdir, isfile
+from pathlib import Path
 from hashlib import md5
 from typing import Dict, List, Optional
 
@@ -25,7 +25,7 @@ class Recipe:
         self,
         recipe: str,
         parent_recipe: Optional[str],
-        config: str,
+        config: Path,
         hostname: str,
         username: str,
         password: str | None,
@@ -36,7 +36,7 @@ class Recipe:
         """Initialize a recipe instance."""
 
         self.log = log
-        if not config or not config.strip():
+        if not str(config).strip():
             self.log.fatal("Invalid value for config")
         if not recipe or not recipe.strip():
             self.log.fatal("Invalid value for recipe")
@@ -101,7 +101,7 @@ class Recipe:
 
         return self._type == self.Type.VIRTUAL
 
-    def get_deep_hash(self, dir_path: str | None = None) -> str:
+    def get_deep_hash(self, dir_path: Path | None = None) -> str:
         """Return an MD5 hash representing the recipe and its requirements."""
 
         hashes = ""
@@ -109,14 +109,15 @@ class Recipe:
             hashes = md5(self.recipe.encode()).hexdigest()
         elif self._type == self.Type.DEFINED:
             if dir_path is None:
-                dir_path = f"{self.cfg.recipes}/{self.recipe}"
+                dir_path = Path(self.cfg.recipes) / self.recipe
 
                 # Execute the hash script and copy its output into our hashes variable.
                 # NOTE: We perform this check specifically inside this block because when
                 # dir_path is None, we know we're at the main recipe directory path.
-                if isfile(f"{dir_path}/hash"):
+                hash_path = dir_path / "hash"
+                if hash_path.is_file():
                     cmd_out, cmd_rc = shell_execute(
-                        f"chmod +x {dir_path}/hash && bash {self.config} && ./{dir_path}/hash"
+                        f"chmod +x {hash_path} && bash {self.config} && ./{hash_path}"
                     )
                     if cmd_rc != 0:
                         raise RuntimeError(cmd_out)
@@ -126,22 +127,22 @@ class Recipe:
                 hashes += recipe.get_deep_hash()
             hashes += md5(str(self).encode()).hexdigest()
             for node in listdir(dir_path):
-                rel_path = f"{dir_path}/{node}"
-                if isfile(rel_path):
-                    with open(rel_path, "rb") as fp:
+                rel_path = dir_path / node
+                if rel_path.is_file():
+                    with rel_path.open("rb") as fp:
                         file_hash = md5(fp.read()).hexdigest()
                     hashes += file_hash
-                elif isdir(rel_path):
+                elif rel_path.is_dir():
                     hashes += self.get_deep_hash(rel_path)
         return md5(hashes.encode()).hexdigest()
 
     def get_requirements(self) -> List["Recipe"]:
         """Return a list of Recipe objects this recipe depends on."""
 
-        req_file = f"{self.cfg.recipes}/{self.recipe}/require"
+        req_file = Path(self.cfg.recipes) / self.recipe / "require"
         requirements: List["Recipe"] = []
-        if isfile(req_file):
-            with open(req_file, "r", encoding="utf-8") as req_fp:
+        if req_file.is_file():
+            with req_file.open("r", encoding="utf-8") as req_fp:
                 for requirement in req_fp.read().split("\n"):
                     requirement = requirement.strip()
                     if requirement == "" or requirement.startswith("#"):
@@ -165,7 +166,7 @@ class Recipe:
     def deploy(self) -> None:
         """Deploy this recipe using SSH/SCP."""
 
-        self.log.info(f"Deploying {self.recipe} to {self.hostname}")
+        self.log.info(f"Deploying '{self.recipe}' to {self.hostname}")
         ssh = SSH(
             recipe=self.recipe,
             log=self.log,
@@ -182,21 +183,21 @@ class Recipe:
             assert transport is not None
             scp = SCP(transport)
             scp.put(
-                f"{self.cfg.recipes}/{self.recipe}",
+                str(Path(self.cfg.recipes) / self.recipe),
                 remote_path=f"/opt/{self.recipe}",
                 recursive=True,
             )
-            scp.put(self.config, remote_path=f"/opt/{self.recipe}/config")
+            scp.put(str(self.config), remote_path=f"/opt/{self.recipe}/config")
 
         try:
             if self._type == self.Type.VIRTUAL:
                 ssh.execute(f"{self.cfg.installer} {self.recipe}")
             elif self._type == self.Type.DEFINED:
-                if not isfile(f"{self.cfg.recipes}/{self.recipe}/run"):
+                if not (Path(self.cfg.recipes) / self.recipe / "run").is_file():
                     # Recipes with no run file are acceptable since they (may) have a require file
                     # and don't necessarily require the execution of anything of their own.
                     self.log.warn(
-                        f"{self.recipe} doesn't have a run file. Continuing..."
+                        f"Recipe '{self.recipe}' has no run file; continuing"
                     )
                 else:
                     ssh.execute(
@@ -209,7 +210,7 @@ class Recipe:
             passed = False
         finally:
             if self._type == self.Type.DEFINED:
-                self.log.info(f"Deleting /opt/{self.recipe} from remote host")
+                self.log.info(f"Removing /opt/{self.recipe} from remote host")
                 ssh.execute(f"rm -rf /opt/{self.recipe}", show_command=False)
 
         if not passed:

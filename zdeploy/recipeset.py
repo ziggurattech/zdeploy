@@ -31,28 +31,27 @@ class RecipeSet:
 
         if recipe in self.recipes:
             self.log.warn(
-                f"{recipe.get_name()} is already added to the recipes list. Skipping..."
+                f"Recipe '{recipe.get_name()}' is already added; skipping"
             )
             return
-        self.log.info(f"Adding '{recipe.get_name()}' to the recipes list")
+        self.log.info(f"Registering recipe '{recipe.get_name()}'")
         self.recipes.append(recipe)
         if recipe.is_virtual():
             self.log.warn(
                 (
-                    f"'{recipe.recipe}' doesn't correspond to anything defined "
-                    f"under the {self.cfg.recipes} directory"
+                    f"Recipe '{recipe.recipe}' is not found under {self.cfg.recipes} "
+                    "and will be treated as a system package"
                 )
             )
             self.log.warn(
                 (
-                    "this recipe will be marked virtual and execute as "
-                    f"`{recipe.cfg.installer} {recipe.recipe}`"
+                    f"The package will be installed using `{recipe.cfg.installer} {recipe.recipe}`"
                 )
             )
             self.log.warn(
                 (
-                    "If you want to use a different package manager, add an "
-                    "'installer' field to the config.json file"
+                    "To use a different package manager, specify "
+                    "an 'installer' entry in config.json"
                 )
             )
 

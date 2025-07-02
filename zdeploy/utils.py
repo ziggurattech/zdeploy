@@ -14,7 +14,7 @@ def str2bool(value: str) -> bool:
         return True
 
     print(
-        f"'{value}' is not a recognized true value; treating as False",
+        f"Warning: '{value}' is not recognized as a true value, defaulting to False",
         file=stderr,
     )
     return False

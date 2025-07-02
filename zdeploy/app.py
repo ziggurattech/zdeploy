@@ -1,7 +1,7 @@
 """Deployment core logic."""
 
-from os import listdir, makedirs, environ
-from os.path import isdir, isfile
+from os import environ
+from pathlib import Path
 from shutil import rmtree
 from datetime import datetime
 from argparse import Namespace
@@ -14,10 +14,10 @@ from zdeploy.log import Log
 from zdeploy.config import Config
 
 
-def _load_recipes(config_path: str, log: Log, cfg: Config) -> RecipeSet:
+def _load_recipes(config_path: Path, log: Log, cfg: Config) -> RecipeSet:
     """Return a ``RecipeSet`` loaded from environment variables."""
 
-    load_dotenv(config_path)
+    load_dotenv(str(config_path))
 
     recipes = RecipeSet(cfg, log)
     recipe_names = environ.get("RECIPES", "")
@@ -56,73 +56,74 @@ def _load_recipes(config_path: str, log: Log, cfg: Config) -> RecipeSet:
     return recipes
 
 
-def _clean_cache(cache_dir_path: str, deployment_cache_path: str, log: Log) -> None:
+def _clean_cache(cache_dir_path: Path, deployment_cache_path: Path, log: Log) -> None:
     """Remove stale cache directories inside ``cache_dir_path``."""
 
-    if not isdir(deployment_cache_path):
-        makedirs(deployment_cache_path)
-    for directory in listdir(cache_dir_path):
-        path = f"{cache_dir_path}/{directory}"
-        if path != deployment_cache_path:
-            log.info(f"Deleting {path}")
-            rmtree(path)
+    if not deployment_cache_path.is_dir():
+        deployment_cache_path.mkdir(parents=True)
+    for directory in cache_dir_path.iterdir():
+        if directory != deployment_cache_path:
+            log.info(f"Removing stale cache directory {directory}")
+            rmtree(directory)
 
 
 def _deploy_recipe(
     recipe: Recipe,
-    deployment_cache_path: str,
+    deployment_cache_path: Path,
     force: bool,
     started_all: datetime,
     log: Log,
 ) -> None:
     """Deploy a single ``recipe`` and update its cache entry."""
 
-    recipe_cache_path = f"{deployment_cache_path}/{recipe.get_name()}"
-    if isfile(recipe_cache_path):
-        with open(recipe_cache_path, "r", encoding="utf-8") as fp:
+    recipe_cache_path = deployment_cache_path / recipe.get_name()
+    if recipe_cache_path.is_file():
+        with recipe_cache_path.open("r", encoding="utf-8") as fp:
             cache_contents = fp.read()
         if recipe.get_deep_hash() in cache_contents and not force:
-            log.warn(f"{recipe.get_name()} is already deployed. Skipping...")
+            log.warn(
+                f"Skipping {recipe.get_name()} because it is already deployed"
+            )
             return
 
     started_recipe = datetime.now()
     log.info(
-        f"Started {recipe.get_name()} recipe deployment at "
+        f"Starting recipe '{recipe.get_name()}' at "
         f"{started_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
     )
     recipe.deploy()
     ended_recipe = datetime.now()
     log.info(
-        f"Ended {recipe.get_name()} recipe deployment at "
+        f"Finished recipe '{recipe.get_name()}' at "
         f"{ended_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
     )
 
     total_recipe_time = ended_recipe - started_recipe
     log.success(f"{recipe.get_name()} finished in {reformat_time(total_recipe_time)}")
-    with open(recipe_cache_path, "w", encoding="utf-8") as fp:
+    with recipe_cache_path.open("w", encoding="utf-8") as fp:
         fp.write(recipe.get_deep_hash())
 
 
 def deploy(
     config_name: str,
-    cache_dir_path: str,
+    cache_dir_path: Path,
     log: Log,
     args: Namespace,
     cfg: Config,
 ) -> None:
     """Deploy recipes defined in ``config_name``."""
 
-    config_path = f"{cfg.configs}/{config_name}"
+    config_path = Path(cfg.configs) / config_name
     print("Config:", config_path)
 
     recipes = _load_recipes(config_path, log, cfg)
 
     started_all = datetime.now()
     log.info(
-        f"Started {config_path} deployment at {started_all:%H:%M:%S} on {started_all:%Y-%m-%d}"
+        f"Starting deployment of {config_path} at {started_all:%H:%M:%S} on {started_all:%Y-%m-%d}"
     )
 
-    deployment_cache_path = f"{cache_dir_path}/{recipes.get_hash()}"
+    deployment_cache_path = cache_dir_path / recipes.get_hash()
     _clean_cache(cache_dir_path, deployment_cache_path, log)
 
     for recipe in recipes:
@@ -131,7 +132,7 @@ def deploy(
     ended_all = datetime.now()
     total_deployment_time = ended_all - started_all
     log.info(
-        f"Ended {config_path} deployment at {ended_all:%H:%M:%S} on {started_all:%Y-%m-%d}"
+        f"Completed deployment of {config_path} at {ended_all:%H:%M:%S} on {started_all:%Y-%m-%d}"
     )
     log.success(f"{config_path} finished in {reformat_time(total_deployment_time)}")
     log.info(f"Deployment hash is {recipes.get_hash()}")
