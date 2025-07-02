@@ -13,7 +13,7 @@ from zdeploy.app import deploy
 from zdeploy.config import load as load_config, Config
 
 
-def handle_config(config_name: str, args: Namespace, cfg: Config) -> None:
+def deploy_config(config_name: str, args: Namespace, cfg: Config) -> None:
     """Deploy a single configuration."""
     log_dir_path = Path(cfg.logs) / config_name
     cache_dir_path = Path(cfg.cache) / config_name
@@ -29,10 +29,10 @@ def handle_config(config_name: str, args: Namespace, cfg: Config) -> None:
         deploy(config_name, cache_dir_path, log, args, cfg)
 
 
-def handle_configs(args: Namespace, cfg: Config) -> None:
+def deploy_configs(args: Namespace, cfg: Config) -> None:
     """Deploy each config provided on the command line."""
     for config_name in args.configs:
-        handle_config(config_name, args, cfg)
+        deploy_config(config_name, args, cfg)
 
 
 def main() -> None:
@@ -57,4 +57,4 @@ def main() -> None:
         const=True,
         type=str2bool,
     )
-    handle_configs(parser.parse_args(), cfg)
+    deploy_configs(parser.parse_args(), cfg)

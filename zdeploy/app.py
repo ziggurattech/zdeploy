@@ -50,8 +50,8 @@ def _load_recipes(config_path: Path, log: Log, cfg: Config) -> RecipeSet:
             if env.startswith(recipe_name) and env != recipe_name:
                 recipe.set_property(env, environ.get(env))
 
-        recipes.add_recipes(recipe.get_requirements())
-        recipes.add_recipe(recipe)
+        recipes.update(recipe.load_requirements())
+        recipes.add(recipe)
 
     return recipes
 
@@ -76,32 +76,32 @@ def _deploy_recipe(
 ) -> None:
     """Deploy a single ``recipe`` and update its cache entry."""
 
-    recipe_cache_path = deployment_cache_path / recipe.get_name()
+    recipe_cache_path = deployment_cache_path / recipe.name
     if recipe_cache_path.is_file():
         with recipe_cache_path.open("r", encoding="utf-8") as fp:
             cache_contents = fp.read()
-        if recipe.get_deep_hash() in cache_contents and not force:
+        if recipe.deep_hash() in cache_contents and not force:
             log.warn(
-                f"Skipping {recipe.get_name()} because it is already deployed"
+                f"Skipping {recipe.name} because it is already deployed"
             )
             return
 
     started_recipe = datetime.now()
     log.info(
-        f"Starting recipe '{recipe.get_name()}' at "
+        f"Starting recipe '{recipe.name}' at "
         f"{started_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
     )
     recipe.deploy()
     ended_recipe = datetime.now()
     log.info(
-        f"Finished recipe '{recipe.get_name()}' at "
+        f"Finished recipe '{recipe.name}' at "
         f"{ended_recipe:%H:%M:%S} on {started_all:%Y-%m-%d}"
     )
 
     total_recipe_time = ended_recipe - started_recipe
-    log.success(f"{recipe.get_name()} finished in {reformat_time(total_recipe_time)}")
+    log.success(f"{recipe.name} finished in {reformat_time(total_recipe_time)}")
     with recipe_cache_path.open("w", encoding="utf-8") as fp:
-        fp.write(recipe.get_deep_hash())
+        fp.write(recipe.deep_hash())
 
 
 def deploy(

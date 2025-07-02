@@ -49,7 +49,7 @@ class Recipe:
 
         self.cfg = cfg
         self.parent_recipe = parent_recipe
-        self.set_recipe_name_and_type(recipe)
+        self._resolve_name_and_type(recipe)
         self.config = config
         self.hostname = hostname
         self.username = username
@@ -61,7 +61,7 @@ class Recipe:
 
         self.properties[key] = value
 
-    def set_recipe_name_and_type(self, recipe: str) -> None:
+    def _resolve_name_and_type(self, recipe: str) -> None:
         """Resolve ``recipe`` name and determine if it is defined or virtual."""
 
         for r in listdir(self.cfg.recipes):
@@ -81,7 +81,8 @@ class Recipe:
 
         return f"{self.recipe} -> {self.username}@{self.hostname}:{self.port} :: {self.properties}"
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         """Return the recipe name."""
 
         return self.recipe
@@ -101,7 +102,7 @@ class Recipe:
 
         return self._type == self.Type.VIRTUAL
 
-    def get_deep_hash(self, dir_path: Path | None = None) -> str:
+    def deep_hash(self, dir_path: Path | None = None) -> str:
         """Return an MD5 hash representing the recipe and its requirements."""
 
         hashes = ""
@@ -123,8 +124,8 @@ class Recipe:
                         raise RuntimeError(cmd_out)
                     hashes += cmd_out
 
-            for recipe in self.get_requirements():
-                hashes += recipe.get_deep_hash()
+            for recipe in self.load_requirements():
+                hashes += recipe.deep_hash()
             hashes += md5(str(self).encode()).hexdigest()
             for node in listdir(dir_path):
                 rel_path = dir_path / node
@@ -133,10 +134,10 @@ class Recipe:
                         file_hash = md5(fp.read()).hexdigest()
                     hashes += file_hash
                 elif rel_path.is_dir():
-                    hashes += self.get_deep_hash(rel_path)
+                    hashes += self.deep_hash(rel_path)
         return md5(hashes.encode()).hexdigest()
 
-    def get_requirements(self) -> List["Recipe"]:
+    def load_requirements(self) -> List["Recipe"]:
         """Return a list of Recipe objects this recipe depends on."""
 
         req_file = Path(self.cfg.recipes) / self.recipe / "require"
@@ -158,7 +159,7 @@ class Recipe:
                         log=self.log,
                         cfg=self.cfg,
                     )
-                    for req in recipe.get_requirements():
+                    for req in recipe.load_requirements():
                         requirements.append(req)
                     requirements.append(recipe)
         return requirements
