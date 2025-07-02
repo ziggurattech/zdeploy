@@ -10,15 +10,21 @@ class RecipeSet:
     """
 
     def __init__(self, cfg, log):
+        """Create an empty ``RecipeSet`` using ``cfg`` and ``log``."""
+
         self.recipes = []
         self.cfg = cfg
         self.log = log
 
     def add_recipes(self, recipes):
+        """Add a sequence of ``recipes`` to the set."""
+
         for recipe in recipes:
             self.add_recipe(recipe)
 
     def add_recipe(self, recipe):
+        """Add a single ``recipe`` if not already present."""
+
         if recipe in self.recipes:
             self.log.warn(
                 f"{recipe.get_name()} is already added to the recipes list. Skipping..."

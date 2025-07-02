@@ -8,6 +8,8 @@ class SSH(SSHClient):
     """SSH helper that exposes a simple execute function."""
 
     def __init__(self, recipe, log, hostname, username, password, port):
+        """Establish an SSH connection to ``hostname``."""
+
         super().__init__()
         self.load_system_host_keys()
         self.set_missing_host_key_policy(AutoAddPolicy())
@@ -49,6 +51,8 @@ class SCP(SCPClient):
     """SCP helper for transferring files over SSH."""
 
     def __init__(self, transport):
+        """Create an SCP client using ``transport``."""
+
         super().__init__(transport)
 
     def __del__(self):

@@ -11,6 +11,8 @@ class Recipe:
     """Represents a deployable script or package."""
 
     class Type:
+        """Supported recipe types."""
+
         DEFINED = 1
         VIRTUAL = 2
 
@@ -50,9 +52,13 @@ class Recipe:
         self.properties = {}
 
     def set_property(self, key, value):
+        """Store an arbitrary ``key``/``value`` pair."""
+
         self.properties[key] = value
 
     def set_recipe_name_and_type(self, recipe):
+        """Resolve ``recipe`` name and determine if it is defined or virtual."""
+
         for r in listdir(self.cfg.recipes):
             if recipe.lower() == r.lower():
                 self.recipe = r
@@ -66,15 +72,23 @@ class Recipe:
         self._type = self.Type.VIRTUAL
 
     def __str__(self):
+        """Return a string representation of this recipe."""
+
         return f"{self.recipe} -> {self.username}@{self.hostname}:{self.port} :: {self.properties}"
 
     def get_name(self):
+        """Return the recipe name."""
+
         return self.recipe
 
     def __hash__(self):
+        """Return a hash so recipes can be used in sets and dictionaries."""
+
         return hash(str(self))
 
     def __eq__(self, other):
+        """Compare recipes by their hash."""
+
         return hash(self) == hash(other)
 
     def get_deep_hash(self, dir_path=None):
