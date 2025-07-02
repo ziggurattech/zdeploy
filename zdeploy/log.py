@@ -1,6 +1,7 @@
 """Simple logging utilities."""
 
 import sys
+from typing import IO, Iterable
 
 class Log:
     """
@@ -12,62 +13,62 @@ class Log:
     logger.register_logger(open('mylog.log', 'w'))
     """
 
-    def __init__(self, *loggers):
+    def __init__(self, *loggers: IO[str]) -> None:
         """Create a new ``Log`` instance and register ``loggers`` if provided."""
 
         self.loggers = list(loggers)
 
-    def register_logger(self, logger):
+    def register_logger(self, logger: IO[str]) -> None:
         """Register a single ``logger`` object."""
 
         self.loggers.append(logger)
 
-    def register_loggers(self, loggers):
+    def register_loggers(self, loggers: Iterable[IO[str]]) -> None:
         """Register multiple ``loggers`` objects."""
 
         for logger in loggers:
             self.register_logger(logger)
 
-    def write(self, *args):
+    def write(self, *args: str) -> None:
         """Write ``args`` to all registered loggers."""
 
         message = " ".join(args)
         for logger in self.loggers:
             logger.write(f"{message}\n")
 
-    def fatal(self, *args):
+    def fatal(self, *args: str) -> None:
         """Log ``args`` as a failure and terminate the program."""
 
         self.fail(*args)
         sys.exit(1)
 
-    def fail(self, *args):
+    def fail(self, *args: str) -> None:
         """Log ``args`` as an error."""
 
         self.write("\033[0;31m", *args, "\033[0;00m")
 
-    def warn(self, *args):
+    def warn(self, *args: str) -> None:
         """Log ``args`` as a warning."""
 
         self.write("\033[1;33m", *args, "\033[0;00m")
 
-    def success(self, *args):
+    def success(self, *args: str) -> None:
         """Log ``args`` as a success message."""
 
         self.write("\033[0;32m", *args, "\033[0;00m")
 
-    def info(self, *args):
+    def info(self, *args: str) -> None:
         """Log ``args`` as an informational message."""
 
         self.write("\033[1;35m", *args, "\033[0;00m")
 
-    def close(self):
+    def close(self) -> None:
         """Close all registered loggers."""
 
         for logger in self.loggers:
             logger.close()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Ensure all loggers are closed when this object is destroyed."""
 
         self.close()

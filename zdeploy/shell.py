@@ -1,9 +1,10 @@
 """Simple shell helpers."""
 
 import subprocess
+from typing import Tuple
 
 
-def execute(cmd):
+def execute(cmd: str) -> Tuple[str, int]:
     """Execute ``cmd`` in a shell and return output and return code."""
 
     with subprocess.Popen(

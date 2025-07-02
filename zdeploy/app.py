@@ -4,13 +4,23 @@ from os import listdir, makedirs, environ
 from os.path import isdir, isfile
 from shutil import rmtree
 from datetime import datetime
+from argparse import Namespace
+
 from dotenv import load_dotenv
 from zdeploy.recipe import Recipe
 from zdeploy.recipeset import RecipeSet
 from zdeploy.utils import reformat_time
+from zdeploy.log import Log
+from zdeploy.config import Config
 
 
-def deploy(config_name, cache_dir_path, log, args, cfg):  # pylint: disable=too-many-locals
+def deploy(
+    config_name: str,
+    cache_dir_path: str,
+    log: Log,
+    args: Namespace,
+    cfg: Config,
+) -> None:  # pylint: disable=too-many-locals
     """Deploy recipes defined in ``config_name``."""
     config_path = f"{cfg.configs}/{config_name}"
     print("Config:", config_path)
@@ -26,9 +36,11 @@ def deploy(config_name, cache_dir_path, log, args, cfg):  # pylint: disable=too-
         host_ip = environ.get(recipe_name)
         if host_ip is None:
             log.fatal(f"{recipe_name} is undefined in {config_path}")
+            raise RuntimeError("undefined host")
         host_user = environ.get(f"{recipe_name}_USER", cfg.user)
         host_password = environ.get(f"{recipe_name}_PASSWORD", cfg.password)
-        host_port = environ.get(f"{recipe_name}_PORT", cfg.port)
+        host_port_str = environ.get(f"{recipe_name}_PORT")
+        host_port = int(host_port_str) if host_port_str is not None else cfg.port
         recipe = Recipe(
             recipe_name,
             None,

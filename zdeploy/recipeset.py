@@ -1,6 +1,11 @@
 """Helper for managing sets of ``Recipe`` objects."""
 
 from hashlib import md5
+from typing import Iterable, Iterator, List
+
+from zdeploy.config import Config
+from zdeploy.log import Log
+from zdeploy.recipe import Recipe
 
 
 class RecipeSet:
@@ -8,20 +13,20 @@ class RecipeSet:
     RecipeSet is a unique set of Recipes maintainer.
     """
 
-    def __init__(self, cfg, log):
+    def __init__(self, cfg: Config, log: Log) -> None:
         """Create an empty ``RecipeSet`` using ``cfg`` and ``log``."""
 
-        self.recipes = []
+        self.recipes: List[Recipe] = []
         self.cfg = cfg
         self.log = log
 
-    def add_recipes(self, recipes):
+    def add_recipes(self, recipes: Iterable[Recipe]) -> None:
         """Add a sequence of ``recipes`` to the set."""
 
         for recipe in recipes:
             self.add_recipe(recipe)
 
-    def add_recipe(self, recipe):
+    def add_recipe(self, recipe: Recipe) -> None:
         """Add a single ``recipe`` if not already present."""
 
         if recipe in self.recipes:
@@ -51,7 +56,7 @@ class RecipeSet:
                 )
             )
 
-    def get_hash(self):
+    def get_hash(self) -> str:
         """
         Return an MD5 hash out of the hash of all recipes combined.
         The end result is used to create a cache directory under deployments cache.
@@ -60,7 +65,7 @@ class RecipeSet:
             " ".join([str(recipe) for recipe in self.recipes]).encode()
         ).hexdigest()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Recipe]:
         """
         Allow caller to iterate over recipes with a regular for loop, e.g.:
         for recipe in recipes:

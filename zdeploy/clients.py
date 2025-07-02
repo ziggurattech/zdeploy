@@ -1,14 +1,24 @@
 """Remote client helpers for recipes."""
 
-from paramiko import SSHClient, AutoAddPolicy
+from paramiko import SSHClient, AutoAddPolicy, Transport
 from scp import SCPClient
+
+from zdeploy.log import Log
 
 
 class SSH(SSHClient):
     """SSH helper that exposes a simple execute function."""
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def __init__(self, recipe, log, hostname, username, password, port):
+    def __init__(
+        self,
+        recipe: str,
+        log: Log,
+        hostname: str,
+        username: str,
+        password: str | None,
+        port: int,
+    ) -> None:
         """Establish an SSH connection to ``hostname``."""
 
         super().__init__()
@@ -18,19 +28,19 @@ class SSH(SSHClient):
         self.recipe = recipe
         self.log = log
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Ensure the SSH connection is closed."""
 
         self.close()
 
     def execute(
         self,
-        *args,
-        bail_on_failure=True,
-        show_command=True,
-        show_output=True,
-        show_error=True,
-    ):
+        *args: str,
+        bail_on_failure: bool = True,
+        show_command: bool = True,
+        show_output: bool = True,
+        show_error: bool = True,
+    ) -> int:
         """Run ``args`` over SSH and return the exit code."""
         cmd = " ".join(args)
         if show_command:
@@ -51,17 +61,17 @@ class SSH(SSHClient):
 class SCP(SCPClient):
     """SCP helper for transferring files over SSH."""
 
-    def __init__(self, transport):
+    def __init__(self, transport: Transport) -> None:
         """Create an SCP client using ``transport``."""
 
         super().__init__(transport)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Ensure the SCP connection is closed."""
 
         self.close()
 
-    def upload(self, src, dest):
+    def upload(self, src: str, dest: str) -> None:
         """Upload ``src`` to ``dest`` on the remote host."""
 
         self.put(src, remote_path=dest)

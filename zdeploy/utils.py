@@ -1,8 +1,14 @@
 """Utility helpers for zdeploy."""
 
 
-def reformat_time(time):
+from datetime import timedelta
+from typing import Union
+
+
+def reformat_time(time: Union[str, timedelta]) -> str:
     """Return ``time`` in "Nh, Nm, and Ns" format."""
 
-    h, m, s = [int(float(x)) for x in (f"{time}").split(":")]
+    if isinstance(time, timedelta):
+        time = str(time)
+    h, m, s = [int(float(x)) for x in time.split(":")]
     return f"{h}h, {m}m, and {s}s"

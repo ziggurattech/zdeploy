@@ -4,8 +4,12 @@
 from os import listdir
 from os.path import isdir, isfile
 from hashlib import md5
+from typing import Dict, List, Optional
+
 from zdeploy.clients import SSH, SCP
 from zdeploy.shell import execute as shell_execute
+from zdeploy.log import Log
+from zdeploy.config import Config
 
 
 class Recipe:
@@ -19,16 +23,16 @@ class Recipe:
 
     def __init__(
         self,
-        recipe,
-        parent_recipe,
-        config,
-        hostname,
-        username,
-        password,
-        port,
-        log,
-        cfg,
-    ):
+        recipe: str,
+        parent_recipe: Optional[str],
+        config: str,
+        hostname: str,
+        username: str,
+        password: str | None,
+        port: int,
+        log: Log,
+        cfg: Config,
+    ) -> None:
         """Initialize a recipe instance."""
 
         self.log = log
@@ -50,14 +54,14 @@ class Recipe:
         self.hostname = hostname
         self.username = username
         self.password = password
-        self.properties = {}
+        self.properties: Dict[str, str | None] = {}
 
-    def set_property(self, key, value):
+    def set_property(self, key: str, value: str | None) -> None:
         """Store an arbitrary ``key``/``value`` pair."""
 
         self.properties[key] = value
 
-    def set_recipe_name_and_type(self, recipe):
+    def set_recipe_name_and_type(self, recipe: str) -> None:
         """Resolve ``recipe`` name and determine if it is defined or virtual."""
 
         for r in listdir(self.cfg.recipes):
@@ -72,32 +76,32 @@ class Recipe:
         self.recipe = recipe
         self._type = self.Type.VIRTUAL
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a string representation of this recipe."""
 
         return f"{self.recipe} -> {self.username}@{self.hostname}:{self.port} :: {self.properties}"
 
-    def get_name(self):
+    def get_name(self) -> str:
         """Return the recipe name."""
 
         return self.recipe
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """Return a hash so recipes can be used in sets and dictionaries."""
 
         return hash(str(self))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         """Compare recipes by their hash."""
 
         return hash(self) == hash(other)
 
-    def is_virtual(self):
+    def is_virtual(self) -> bool:
         """Return ``True`` if this is a virtual recipe."""
 
         return self._type == self.Type.VIRTUAL
 
-    def get_deep_hash(self, dir_path=None):
+    def get_deep_hash(self, dir_path: str | None = None) -> str:
         """Return an MD5 hash representing the recipe and its requirements."""
 
         hashes = ""
@@ -131,11 +135,11 @@ class Recipe:
                     hashes += self.get_deep_hash(rel_path)
         return md5(hashes.encode()).hexdigest()
 
-    def get_requirements(self):
+    def get_requirements(self) -> List["Recipe"]:
         """Return a list of Recipe objects this recipe depends on."""
 
         req_file = f"{self.cfg.recipes}/{self.recipe}/require"
-        requirements = []
+        requirements: List["Recipe"] = []
         if isfile(req_file):
             with open(req_file, "r", encoding="utf-8") as req_fp:
                 for requirement in req_fp.read().split("\n"):
@@ -158,7 +162,7 @@ class Recipe:
                     requirements.append(recipe)
         return requirements
 
-    def deploy(self):
+    def deploy(self) -> None:
         """Deploy this recipe using SSH/SCP."""
 
         self.log.info(f"Deploying {self.recipe} to {self.hostname}")
@@ -174,7 +178,9 @@ class Recipe:
         if self._type == self.Type.DEFINED:
             ssh.execute(f"rm -rf /opt/{self.recipe}", show_command=False)
 
-            scp = SCP(ssh.get_transport())
+            transport = ssh.get_transport()
+            assert transport is not None
+            scp = SCP(transport)
             scp.put(
                 f"{self.cfg.recipes}/{self.recipe}",
                 remote_path=f"/opt/{self.recipe}",
