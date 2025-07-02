@@ -1,14 +1,31 @@
 """Configuration loader for zdeploy."""
 
+from dataclasses import dataclass
 from json import loads
 from os.path import isfile
+from typing import Any, Dict, cast
 
 
-def load(cfg_path="config.json"):
+@dataclass
+class Config:
+    """Simple container for configuration settings."""
+
+    configs: str = "configs"
+    recipes: str = "recipes"
+    cache: str = "cache"
+    logs: str = "logs"
+    installer: str = "apt-get install -y"
+    force: str = "no"
+    user: str = "root"
+    password: str | None = None
+    port: int = 22
+
+
+def load(cfg_path: str = "config.json") -> Config:
     """Load configuration from ``cfg_path`` or return defaults."""
 
     # Initiate an empty config dictionary in case a config file isn't present.
-    cfg = {}
+    cfg: Dict[str, Any] = {}
 
     if isfile(cfg_path):
         # Load data in JSON form.
@@ -16,29 +33,28 @@ def load(cfg_path="config.json"):
             cfg = loads(fp.read())
 
     # Set defaults
-    cfg["configs"] = cfg.get("configs", "configs")
-    cfg["recipes"] = cfg.get("recipes", "recipes")
-    cfg["cache"] = cfg.get("cache", "cache")
-    cfg["logs"] = cfg.get("logs", "logs")
+    cfg["configs"] = cfg.get("configs", Config.configs)
+    cfg["recipes"] = cfg.get("recipes", Config.recipes)
+    cfg["cache"] = cfg.get("cache", Config.cache)
+    cfg["logs"] = cfg.get("logs", Config.logs)
 
     # Default installer is apt-get. This is used for virtual
     # recipes (recipes that aren't defined by a directory
     # structure).
-    cfg["installer"] = cfg.get("installer", "apt-get install -y")
+    cfg["installer"] = cfg.get("installer", Config.installer)
 
     # Force is disabled by default. This sets the behavior to
     # only deploy undeployed recipes and/or pick up where a
     # previous deployment was halted or had crashed.
-    cfg["force"] = cfg.get("force", "no")
+    cfg["force"] = cfg.get("force", Config.force)
 
     # Default username is root
-    cfg["user"] = cfg.get("user", "root")
+    cfg["user"] = cfg.get("user", Config.user)
 
     # The default is no password (private key present)
-    cfg["password"] = cfg.get("password", None)
+    cfg["password"] = cfg.get("password", Config.password)
 
-    cfg["port"] = cfg.get("port", 22)
+    cfg["port"] = cfg.get("port", Config.port)
 
-    # Turn cfg into a class allowing us to reference all the field via the dot operator,
-    # e.g.: cfg.logs instead of cfg['logs']
-    return type("", (), cfg)
+    # Convert the dictionary into a Config instance to allow attribute access
+    return Config(**cast(Dict[str, Any], cfg))

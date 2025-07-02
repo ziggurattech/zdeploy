@@ -18,7 +18,7 @@ def deploy(config_name, cache_dir_path, log, args, cfg):
 
     recipes = RecipeSet(cfg, log)
 
-    recipe_names = environ.get("RECIPES")
+    recipe_names = environ.get("RECIPES", "")
     if recipe_names.startswith("(") and recipe_names.endswith(")"):
         recipe_names = recipe_names[1:-1]
     for recipe_name in recipe_names.split(" "):
