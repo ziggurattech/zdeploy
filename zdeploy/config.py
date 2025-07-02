@@ -1,4 +1,5 @@
 """Configuration loader for zdeploy."""
+# pylint: disable=too-many-instance-attributes
 
 from dataclasses import dataclass
 from json import loads
@@ -6,7 +7,7 @@ from os.path import isfile
 from typing import Any, Dict, cast
 
 
-@dataclass
+@dataclass  # pylint: disable=too-many-instance-attributes
 class Config:
     """Simple container for configuration settings."""
 

@@ -7,6 +7,7 @@ from scp import SCPClient
 class SSH(SSHClient):
     """SSH helper that exposes a simple execute function."""
 
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(self, recipe, log, hostname, username, password, port):
         """Establish an SSH connection to ``hostname``."""
 
@@ -43,7 +44,7 @@ class SSH(SSHClient):
             if show_error:
                 self.log.fail(f"Failed to run '{cmd}'. Exit code: {rc}")
             if bail_on_failure:
-                raise Exception(f"failed to execute {cmd}")
+                raise RuntimeError(f"failed to execute {cmd}")
         return rc
 
 

@@ -1,4 +1,5 @@
 """Recipe abstraction for deploying and tracking dependencies."""
+# pylint: disable=too-many-instance-attributes,too-few-public-methods,too-many-arguments,too-many-positional-arguments
 
 from os import listdir
 from os.path import isdir, isfile
@@ -91,6 +92,11 @@ class Recipe:
 
         return hash(self) == hash(other)
 
+    def is_virtual(self):
+        """Return ``True`` if this is a virtual recipe."""
+
+        return self._type == self.Type.VIRTUAL
+
     def get_deep_hash(self, dir_path=None):
         """Return an MD5 hash representing the recipe and its requirements."""
 
@@ -109,7 +115,7 @@ class Recipe:
                         f"chmod +x {dir_path}/hash && bash {self.config} && ./{dir_path}/hash"
                     )
                     if cmd_rc != 0:
-                        raise Exception(cmd_out)
+                        raise RuntimeError(cmd_out)
                     hashes += cmd_out
 
             for recipe in self.get_requirements():
@@ -118,7 +124,8 @@ class Recipe:
             for node in listdir(dir_path):
                 rel_path = f"{dir_path}/{node}"
                 if isfile(rel_path):
-                    file_hash = md5(open(rel_path, "rb").read()).hexdigest()
+                    with open(rel_path, "rb") as fp:
+                        file_hash = md5(fp.read()).hexdigest()
                     hashes += file_hash
                 elif isdir(rel_path):
                     hashes += self.get_deep_hash(rel_path)
@@ -130,24 +137,25 @@ class Recipe:
         req_file = f"{self.cfg.recipes}/{self.recipe}/require"
         requirements = []
         if isfile(req_file):
-            for requirement in open(req_file).read().split("\n"):
-                requirement = requirement.strip()
-                if requirement == "" or requirement.startswith("#"):
-                    continue
-                recipe = Recipe(
-                    recipe=requirement,
-                    parent_recipe=self.recipe,
-                    config=self.config,
-                    hostname=self.hostname,
-                    username=self.username,
-                    password=self.password,
-                    port=self.port,
-                    log=self.log,
-                    cfg=self.cfg,
-                )
-                for req in recipe.get_requirements():
-                    requirements.append(req)
-                requirements.append(recipe)
+            with open(req_file, "r", encoding="utf-8") as req_fp:
+                for requirement in req_fp.read().split("\n"):
+                    requirement = requirement.strip()
+                    if requirement == "" or requirement.startswith("#"):
+                        continue
+                    recipe = Recipe(
+                        recipe=requirement,
+                        parent_recipe=self.recipe,
+                        config=self.config,
+                        hostname=self.hostname,
+                        username=self.username,
+                        password=self.password,
+                        port=self.port,
+                        log=self.log,
+                        cfg=self.cfg,
+                    )
+                    for req in recipe.get_requirements():
+                        requirements.append(req)
+                    requirements.append(recipe)
         return requirements
 
     def deploy(self):
@@ -190,7 +198,8 @@ class Recipe:
                         show_command=False,
                     )
             passed = True
-        except Exception:
+        except Exception as exc:  # pylint: disable=broad-except
+            self.log.fail(str(exc))
             passed = False
         finally:
             if self._type == self.Type.DEFINED:

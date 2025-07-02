@@ -1,7 +1,6 @@
 """Helper for managing sets of ``Recipe`` objects."""
 
 from hashlib import md5
-from zdeploy.recipe import Recipe
 
 
 class RecipeSet:
@@ -32,7 +31,7 @@ class RecipeSet:
             return
         self.log.info(f"Adding '{recipe.get_name()}' to the recipes list")
         self.recipes.append(recipe)
-        if recipe._type == Recipe.Type.VIRTUAL:
+        if recipe.is_virtual():
             self.log.warn(
                 (
                     f"'{recipe.recipe}' doesn't correspond to anything defined "
