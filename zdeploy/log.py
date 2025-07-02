@@ -24,7 +24,7 @@ class Log:
     def write(self, *args):
         message = " ".join(args)
         for logger in self.loggers:
-            logger.write("%s\n" % message)
+            logger.write(f"{message}\n")
 
     def fatal(self, *args):
         self.fail(*args)

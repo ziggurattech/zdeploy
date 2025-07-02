@@ -2,7 +2,6 @@
 
 from os import listdir
 from os.path import isdir, isfile
-from datetime import datetime
 from hashlib import md5
 from zdeploy.clients import SSH, SCP
 from zdeploy.shell import execute as shell_execute
@@ -39,7 +38,7 @@ class Recipe:
         try:
             self.port = int(port)
         except ValueError:
-            self.log.fatal("Invalid value for port: %s" % port)
+            self.log.fatal(f"Invalid value for port: {port}")
 
         self.cfg = cfg
         self.parent_recipe = parent_recipe
@@ -59,7 +58,7 @@ class Recipe:
                 self.recipe = r
                 if self.parent_recipe == r:
                     # Recipe references itself
-                    self.log.fatal("Invalid recipe: %s references itself" % r)
+                    self.log.fatal(f"Invalid recipe: {r} references itself")
                 else:
                     self._type = self.Type.DEFINED
                 return
@@ -67,13 +66,7 @@ class Recipe:
         self._type = self.Type.VIRTUAL
 
     def __str__(self):
-        return "%s -> %s@%s:%d :: %s" % (
-            self.recipe,
-            self.username,
-            self.hostname,
-            self.port,
-            self.properties,
-        )
+        return f"{self.recipe} -> {self.username}@{self.hostname}:{self.port} :: {self.properties}"
 
     def get_name(self):
         return self.recipe
@@ -92,15 +85,14 @@ class Recipe:
             hashes = md5(self.recipe.encode()).hexdigest()
         elif self._type == self.Type.DEFINED:
             if dir_path is None:
-                dir_path = "%s/%s" % (self.cfg.recipes, self.recipe)
+                dir_path = f"{self.cfg.recipes}/{self.recipe}"
 
                 # Execute the hash script and copy its output into our hashes variable.
                 # NOTE: We perform this check specifically inside this block because when
                 # dir_path is None, we know we're at the main recipe directory path.
-                if isfile("%s/hash" % dir_path):
+                if isfile(f"{dir_path}/hash"):
                     cmd_out, cmd_rc = shell_execute(
-                        "chmod +x %s/hash && bash %s && ./%s/hash"
-                        % (dir_path, self.config, dir_path)
+                        f"chmod +x {dir_path}/hash && bash {self.config} && ./{dir_path}/hash"
                     )
                     if cmd_rc != 0:
                         raise Exception(cmd_out)
@@ -110,7 +102,7 @@ class Recipe:
                 hashes += recipe.get_deep_hash()
             hashes += md5(str(self).encode()).hexdigest()
             for node in listdir(dir_path):
-                rel_path = "%s/%s" % (dir_path, node)
+                rel_path = f"{dir_path}/{node}"
                 if isfile(rel_path):
                     file_hash = md5(open(rel_path, "rb").read()).hexdigest()
                     hashes += file_hash
@@ -121,7 +113,7 @@ class Recipe:
     def get_requirements(self):
         """Return a list of Recipe objects this recipe depends on."""
 
-        req_file = "%s/%s/require" % (self.cfg.recipes, self.recipe)
+        req_file = f"{self.cfg.recipes}/{self.recipe}/require"
         requirements = []
         if isfile(req_file):
             for requirement in open(req_file).read().split("\n"):
@@ -147,7 +139,7 @@ class Recipe:
     def deploy(self):
         """Deploy this recipe using SSH/SCP."""
 
-        self.log.info("Deploying %s to %s" % (self.recipe, self.hostname))
+        self.log.info(f"Deploying {self.recipe} to {self.hostname}")
         ssh = SSH(
             recipe=self.recipe,
             log=self.log,
@@ -158,29 +150,29 @@ class Recipe:
         )
 
         if self._type == self.Type.DEFINED:
-            ssh.execute("rm -rf /opt/%s" % self.recipe, show_command=False)
+            ssh.execute(f"rm -rf /opt/{self.recipe}", show_command=False)
 
             scp = SCP(ssh.get_transport())
             scp.put(
-                "%s/%s" % (self.cfg.recipes, self.recipe),
-                remote_path="/opt/%s" % self.recipe,
+                f"{self.cfg.recipes}/{self.recipe}",
+                remote_path=f"/opt/{self.recipe}",
                 recursive=True,
             )
-            scp.put(self.config, remote_path="/opt/%s/config" % self.recipe)
+            scp.put(self.config, remote_path=f"/opt/{self.recipe}/config")
 
         try:
             if self._type == self.Type.VIRTUAL:
-                ssh.execute("%s %s" % (self.cfg.installer, self.recipe))
+                ssh.execute(f"{self.cfg.installer} {self.recipe}")
             elif self._type == self.Type.DEFINED:
-                if not isfile("%s/%s/run" % (self.cfg.recipes, self.recipe)):
+                if not isfile(f"{self.cfg.recipes}/{self.recipe}/run"):
                     # Recipes with no run file are acceptable since they (may) have a require file
                     # and don't necessarily require the execution of anything of their own.
                     self.log.warn(
-                        "%s doesn't have a run file. Continuing..." % self.recipe
+                        f"{self.recipe} doesn't have a run file. Continuing..."
                     )
                 else:
                     ssh.execute(
-                        "cd /opt/%s && chmod +x ./run && ./run" % self.recipe,
+                        f"cd /opt/{self.recipe} && chmod +x ./run && ./run",
                         show_command=False,
                     )
             passed = True
@@ -188,9 +180,9 @@ class Recipe:
             passed = False
         finally:
             if self._type == self.Type.DEFINED:
-                self.log.info("Deleting /opt/%s from remote host" % self.recipe)
-                ssh.execute("rm -rf /opt/%s" % self.recipe, show_command=False)
+                self.log.info(f"Deleting /opt/{self.recipe} from remote host")
+                ssh.execute(f"rm -rf /opt/{self.recipe}", show_command=False)
 
         if not passed:
-            self.log.fatal("Failed to deploy %s" % self.recipe)
-        self.log.success("Done with %s" % self.recipe)
+            self.log.fatal(f"Failed to deploy {self.recipe}")
+        self.log.success(f"Done with {self.recipe}")

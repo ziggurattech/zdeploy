@@ -32,16 +32,16 @@ class SSH(SSHClient):
         cmd = " ".join(args)
         if show_command:
             self.log.info("Running", cmd)
-        _, stdout, _ = self.exec_command("%s 2>&1" % cmd)
+        _, stdout, _ = self.exec_command(f"{cmd} 2>&1")
         if show_output:
             for line in stdout:
-                self.log.info("%s: %s" % (self.recipe, line.rstrip()))
+                self.log.info(f"{self.recipe}: {line.rstrip()}")
         rc = stdout.channel.recv_exit_status()
         if rc != 0:
             if show_error:
-                self.log.fail("Failed to run '%s'. Exit code: %d" % (cmd, rc))
+                self.log.fail(f"Failed to run '{cmd}'. Exit code: {rc}")
             if bail_on_failure:
-                raise Exception("failed to execute %s" % cmd)
+                raise Exception(f"failed to execute {cmd}")
         return rc
 
 
