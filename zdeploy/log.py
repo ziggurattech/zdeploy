@@ -1,5 +1,6 @@
 """Simple logging utilities."""
 
+import sys
 
 class Log:
     """
@@ -38,7 +39,7 @@ class Log:
         """Log ``args`` as a failure and terminate the program."""
 
         self.fail(*args)
-        exit(1)
+        sys.exit(1)
 
     def fail(self, *args):
         """Log ``args`` as an error."""

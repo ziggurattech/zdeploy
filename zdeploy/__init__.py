@@ -20,7 +20,7 @@ def str2bool(value):
         return True
     if value.lower() in ("no", "n"):
         return False
-    raise Exception(f"Invalid value: {value}")
+    raise ValueError(f"Invalid value: {value}")
 
 
 def handle_config(config_name, args, cfg):
@@ -34,14 +34,13 @@ def handle_config(config_name, args, cfg):
         makedirs(cache_dir_path)
     log = Log()
     log.register_logger(stdout)
-    log.register_logger(
-        open(
-            f"{log_dir_path}/{datetime.now():%Y-%m-%d %H:%M:%S}.log",
-            "w",
-            encoding="utf-8",
-        )
-    )
-    deploy(config_name, cache_dir_path, log, args, cfg)
+    with open(
+        f"{log_dir_path}/{datetime.now():%Y-%m-%d %H:%M:%S}.log",
+        "w",
+        encoding="utf-8",
+    ) as log_file:
+        log.register_logger(log_file)
+        deploy(config_name, cache_dir_path, log, args, cfg)
 
 
 def handle_configs(args, cfg):
