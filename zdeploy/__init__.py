@@ -1,60 +1,71 @@
-from argparse import ArgumentParser
-from os.path import isdir
-from os import listdir, makedirs
-from sys import stdout
+"""Command line interface for zdeploy."""
+
+from argparse import ArgumentParser, Namespace
 from datetime import datetime
-from zdeploy.log import Log
+import logging
+from os import listdir
+from pathlib import Path
+from sys import stdout
+
+from zdeploy.utils import str2bool
+
 from zdeploy.app import deploy
-from zdeploy.config import load as load_config
+from zdeploy.config import load as load_config, Config
 
-def str2bool(v):
-    if isinstance(v, bool):
-       return v
-    if v.lower() in ('yes', 'y'):
-        return True
-    elif v.lower() in ('no', 'n'):
-        return False
-    raise Exception('Invalid value: %s' % v)
 
-def handle_config(config_name, args, cfg):
-    # TODO: document
-    log_dir_path = '%s/%s' % (cfg.logs, config_name)
-    cache_dir_path = '%s/%s' % (cfg.cache, config_name)
-    if not isdir(log_dir_path):
-        makedirs(log_dir_path)
-    if not isdir(cache_dir_path):
-        makedirs(cache_dir_path)
-    log = Log()
-    log.register_logger(stdout)
-    log.register_logger(open('%s/%s.log' % (log_dir_path, '{0:%Y-%m-%d %H:%M:%S}'.format(datetime.now())), 'w'))
-    deploy(config_name, cache_dir_path, log, args, cfg)
+def deploy_config(config_name: str, args: Namespace, cfg: Config) -> None:
+    """Deploy a single configuration."""
+    log_dir_path = Path(cfg.logs) / config_name
+    cache_dir_path = Path(cfg.cache) / config_name
+    if not log_dir_path.is_dir():
+        log_dir_path.mkdir(parents=True)
+    if not cache_dir_path.is_dir():
+        cache_dir_path.mkdir(parents=True)
+    log_file_path = log_dir_path / f"{datetime.now():%Y-%m-%d %H:%M:%S}.log"
 
-def handle_configs(args, cfg):
-    '''
-    Iterate over all retrieved configs and deploy them in a pipelined order.
-    '''
+    logger = logging.getLogger(config_name)
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(message)s")
+    stream_handler = logging.StreamHandler(stdout)
+    stream_handler.setFormatter(formatter)
+    file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+    logger.addHandler(file_handler)
+
+    try:
+        deploy(config_name, cache_dir_path, logger, args, cfg)
+    finally:
+        logger.removeHandler(file_handler)
+        file_handler.close()
+
+
+def deploy_configs(args: Namespace, cfg: Config) -> None:
+    """Deploy each config provided on the command line."""
     for config_name in args.configs:
-        handle_config(config_name, args, cfg)
+        deploy_config(config_name, args, cfg)
 
-def main():
-    # Default config file name is config.json, so it needs not be specified in our case.
+
+def main() -> None:
+    """CLI entry point."""
     cfg = load_config()
     parser = ArgumentParser()
     parser.add_argument(
-        '-c',
-        '--configs',
-        help='Deployment destination(s)',
-        nargs='+',
+        "-c",
+        "--configs",
+        help="Deployment destination(s)",
+        nargs="+",
         required=True,
-        choices=listdir(cfg.configs) if isdir(cfg.configs) else ())
-    parser.add_argument(
-        '-f',
-        '--force',
-        help='Force full deployment (overlooks the cache)',
-        nargs='?',
-        required=False,
-        default=cfg.force, # Default behavior can be defined by the user in a config file
-        const=True,
-        type=str2bool
+        choices=listdir(cfg.configs) if Path(cfg.configs).is_dir() else (),
     )
-    handle_configs(parser.parse_args(), cfg)
+    parser.add_argument(
+        "-f",
+        "--force",
+        help="Force full deployment (overlooks the cache)",
+        nargs="?",
+        required=False,
+        default=cfg.force,
+        const=True,
+        type=str2bool,
+    )
+    deploy_configs(parser.parse_args(), cfg)

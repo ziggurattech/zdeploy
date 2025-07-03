@@ -1,37 +1,57 @@
+"""Helper for managing sets of ``Recipe`` objects."""
+
 from hashlib import md5
+from typing import Iterable
+import logging
+
+from zdeploy.config import Config
 from zdeploy.recipe import Recipe
 
-class RecipeSet:
-    '''
-        RecipeSet is a unique set of Recipes maintainer.
-    '''
-    def __init__(self, cfg, log):
-        self.recipes = []
+
+class RecipeSet(set[Recipe]):
+    """Container for ``Recipe`` objects with convenience helpers."""
+
+    def __init__(self, cfg: Config, log: logging.Logger) -> None:
+        """Create an empty ``RecipeSet`` using ``cfg`` and ``log``."""
+
+        super().__init__()
         self.cfg = cfg
         self.log = log
-    def add_recipes(self, recipes):
+
+    def update(self, recipes: Iterable[Recipe]) -> None:  # type: ignore[override]
+        """Add a sequence of ``recipes`` to the set."""
+
         for recipe in recipes:
-            self.add_recipe(recipe)
-    def add_recipe(self, recipe):
-        if recipe in self.recipes:
-            self.log.warn('%s is already added to the recipes list. Skipping...' % recipe.get_name())
+            self.add(recipe)
+
+    def add(self, recipe: Recipe) -> None:  # type: ignore[override]
+        """Add a single ``recipe`` if not already present."""
+
+        if recipe in self:
+            self.log.warning("Recipe '%s' is already added; skipping", recipe.name)
             return
-        self.log.info("Adding '%s' to the recipes list" % recipe.get_name())
-        self.recipes.append(recipe)
-        if recipe._type == Recipe.Type.VIRTUAL:
-            self.log.warn("'%s' doesn't correspond to anything defined under the %s directory" % (recipe.recipe, self.cfg.recipes))
-            self.log.warn("this recipe will be marked virtual and execute as `%s %s`" % (recipe.cfg.installer, recipe.recipe))
-            self.log.warn("If you want to use a different package manager, add an 'installer' field to the config.json file")
-    def get_hash(self):
-        '''
-        Return an MD5 hash out of the hash of all recipes combined.
-        The end result is used to create a cache directory under deployments cache.
-        '''
-        return md5(' '.join([str(recipe) for recipe in self.recipes]).encode()).hexdigest()
-    def __iter__(self):
-        '''
-        Allow caller to iterate over recipes with a regular for loop, e.g.:
-        for recipe in recipes:
-            print(recipe)
-        '''
-        return iter(self.recipes)
+        self.log.info("Registering recipe '%s'", recipe.name)
+        super().add(recipe)
+        if recipe.is_virtual():
+            self.log.warning(
+                (
+                    f"Recipe '{recipe.recipe}' is not found under {self.cfg.recipes} "
+                    "and will be treated as a system package"
+                )
+            )
+            self.log.warning(
+                (
+                    f"The package will be installed using `{recipe.cfg.installer} {recipe.recipe}`"
+                )
+            )
+            self.log.warning(
+                (
+                    "To use a different package manager, specify "
+                    "an 'installer' entry in config.json"
+                )
+            )
+
+    def get_hash(self) -> str:
+        """Return an MD5 hash of all recipes combined."""
+
+        return md5(" ".join(str(recipe) for recipe in self).encode()).hexdigest()

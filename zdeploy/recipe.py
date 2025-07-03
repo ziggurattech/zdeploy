@@ -1,141 +1,223 @@
+"""Recipe abstraction for deploying and tracking dependencies."""
+# pylint: disable=too-many-instance-attributes,too-few-public-methods,too-many-arguments,too-many-positional-arguments
+
 from os import listdir
-from os.path import isdir, isfile
-from datetime import datetime
+from pathlib import Path
 from hashlib import md5
+from typing import Dict, List, Optional
+import logging
+
 from zdeploy.clients import SSH, SCP
 from zdeploy.shell import execute as shell_execute
+from zdeploy.config import Config
+
 
 class Recipe:
+    """Represents a deployable script or package."""
+
     class Type:
+        """Supported recipe types."""
+
         DEFINED = 1
         VIRTUAL = 2
-    def __init__(self, recipe, parent_recipe, config, hostname, username, password, port, log, cfg):
+
+    def __init__(
+        self,
+        recipe: str,
+        parent_recipe: Optional[str],
+        config: Path,
+        hostname: str,
+        username: str,
+        password: str | None,
+        port: int,
+        log: logging.Logger,
+        cfg: Config,
+    ) -> None:
+        """Initialize a recipe instance."""
+
         self.log = log
-        if not config or not len(config.strip()):
-            self.log.fatal('Invalid value for config')
-        if not recipe or not len(recipe.strip()):
-            self.log.fatal('Invalid value for recipe')
-        if not hostname or not len(hostname.strip()):
-            self.log.fatal('Invalid value for hostname')
+        if not str(config).strip():
+            self.log.error("Invalid value for config")
+            raise ValueError("invalid config")
+        if not recipe or not recipe.strip():
+            self.log.error("Invalid value for recipe")
+            raise ValueError("invalid recipe")
+        if not hostname or not hostname.strip():
+            self.log.error("Invalid value for hostname")
+            raise ValueError("invalid hostname")
         try:
             self.port = int(port)
         except ValueError:
-            self.log.fatal('Invalid value for port: %s' % port)
+            self.log.error("Invalid value for port: %s", port)
+            raise
 
         self.cfg = cfg
         self.parent_recipe = parent_recipe
-        self.set_recipe_name_and_type(recipe)
+        self._resolve_name_and_type(recipe)
         self.config = config
         self.hostname = hostname
         self.username = username
         self.password = password
-        self.properties = {}
-    def set_property(self, key, value):
+        self.properties: Dict[str, str | None] = {}
+
+    def set_property(self, key: str, value: str | None) -> None:
+        """Store an arbitrary ``key``/``value`` pair."""
+
         self.properties[key] = value
-    def set_recipe_name_and_type(self, recipe):
+
+    def _resolve_name_and_type(self, recipe: str) -> None:
+        """Resolve ``recipe`` name and determine if it is defined or virtual."""
+
         for r in listdir(self.cfg.recipes):
             if recipe.lower() == r.lower():
                 self.recipe = r
                 if self.parent_recipe == r:
                     # Recipe references itself
-                    self.log.fatal('Invalid recipe: %s references itself' % r)
-                else:
-                    self._type = self.Type.DEFINED
+                    self.log.error("Invalid recipe: %s references itself", r)
+                    raise ValueError("recipe references itself")
+                self._type = self.Type.DEFINED
                 return
         self.recipe = recipe
         self._type = self.Type.VIRTUAL
-    def __str__(self):
-        return '%s -> %s@%s:%d :: %s' % (self.recipe, self.username, self.hostname, self.port, self.properties)
-    def get_name(self):
+
+    def __str__(self) -> str:
+        """Return a string representation of this recipe."""
+
+        return f"{self.recipe} -> {self.username}@{self.hostname}:{self.port} :: {self.properties}"
+
+    @property
+    def name(self) -> str:
+        """Return the recipe name."""
+
         return self.recipe
-    def __hash__(self):
+
+    def __hash__(self) -> int:
+        """Return a hash so recipes can be used in sets and dictionaries."""
+
         return hash(str(self))
-    def __eq__(self, other):
+
+    def __eq__(self, other: object) -> bool:
+        """Compare recipes by their hash."""
+
         return hash(self) == hash(other)
-    def get_deep_hash(self, dir_path=None):
-        hashes = ''
+
+    def is_virtual(self) -> bool:
+        """Return ``True`` if this is a virtual recipe."""
+
+        return self._type == self.Type.VIRTUAL
+
+    def deep_hash(self, dir_path: Path | None = None) -> str:
+        """Return an MD5 hash representing the recipe and its requirements."""
+
+        hashes = ""
         if self._type == self.Type.VIRTUAL:
             hashes = md5(self.recipe.encode()).hexdigest()
         elif self._type == self.Type.DEFINED:
             if dir_path is None:
-                dir_path = '%s/%s' % (self.cfg.recipes, self.recipe)
+                dir_path = Path(self.cfg.recipes) / self.recipe
 
                 # Execute the hash script and copy its output into our hashes variable.
                 # NOTE: We perform this check specifically inside this block because when
                 # dir_path is None, we know we're at the main recipe directory path.
-                if isfile('%s/hash' % dir_path):
-                    cmd_out, cmd_rc = shell_execute('chmod +x %s/hash && bash %s && ./%s/hash' % (dir_path, self.config, dir_path))
+                hash_path = dir_path / "hash"
+                if hash_path.is_file():
+                    cmd_out, cmd_rc = shell_execute(
+                        f"chmod +x {hash_path} && bash {self.config} && ./{hash_path}"
+                    )
                     if cmd_rc != 0:
-                        raise Exception(cmd_out)
+                        raise RuntimeError(cmd_out)
                     hashes += cmd_out
 
-            for recipe in self.get_requirements():
-                hashes += recipe.get_deep_hash()
+            for recipe in self.load_requirements():
+                hashes += recipe.deep_hash()
             hashes += md5(str(self).encode()).hexdigest()
             for node in listdir(dir_path):
-                rel_path = '%s/%s' % (dir_path, node)
-                if isfile(rel_path):
-                    file_hash = md5(open(rel_path, 'rb').read()).hexdigest()
+                rel_path = dir_path / node
+                if rel_path.is_file():
+                    with rel_path.open("rb") as fp:
+                        file_hash = md5(fp.read()).hexdigest()
                     hashes += file_hash
-                elif isdir(rel_path):
-                    hashes += self.get_deep_hash(rel_path)
+                elif rel_path.is_dir():
+                    hashes += self.deep_hash(rel_path)
         return md5(hashes.encode()).hexdigest()
-    def get_requirements(self):
-        req_file = '%s/%s/require' % (self.cfg.recipes, self.recipe)
-        requirements = []
-        if isfile(req_file):
-            for requirement in open(req_file).read().split('\n'):
-                requirement = requirement.strip()
-                if requirement == '' or requirement.startswith('#'):
-                    continue
-                recipe = Recipe(
-                    recipe=requirement,
-                    parent_recipe=self.recipe,
-                    config=self.config,
-                    hostname=self.hostname,
-                    username=self.username,
-                    password=self.password,
-                    port=self.port,
-                    log=self.log,
-                    cfg=self.cfg)
-                for req in recipe.get_requirements():
-                    requirements.append(req)
-                requirements.append(recipe)
+
+    def load_requirements(self) -> List["Recipe"]:
+        """Return a list of Recipe objects this recipe depends on."""
+
+        req_file = Path(self.cfg.recipes) / self.recipe / "require"
+        requirements: List["Recipe"] = []
+        if req_file.is_file():
+            with req_file.open("r", encoding="utf-8") as req_fp:
+                for requirement in req_fp.read().split("\n"):
+                    requirement = requirement.strip()
+                    if requirement == "" or requirement.startswith("#"):
+                        continue
+                    recipe = Recipe(
+                        recipe=requirement,
+                        parent_recipe=self.recipe,
+                        config=self.config,
+                        hostname=self.hostname,
+                        username=self.username,
+                        password=self.password,
+                        port=self.port,
+                        log=self.log,
+                        cfg=self.cfg,
+                    )
+                    for req in recipe.load_requirements():
+                        requirements.append(req)
+                    requirements.append(recipe)
         return requirements
-    def deploy(self):
-        self.log.info('Deploying %s to %s' % (self.recipe, self.hostname))
-        ssh = SSH(recipe=self.recipe,
+
+    def deploy(self) -> None:
+        """Deploy this recipe using SSH/SCP."""
+
+        self.log.info(f"Deploying '{self.recipe}' to {self.hostname}")
+        ssh = SSH(
+            recipe=self.recipe,
             log=self.log,
             hostname=self.hostname,
             username=self.username,
             password=self.password,
-            port=self.port)
+            port=self.port,
+        )
 
         if self._type == self.Type.DEFINED:
-            ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
+            ssh.execute(f"rm -rf /opt/{self.recipe}", show_command=False)
 
-            scp = SCP(ssh.get_transport())
-            scp.put('%s/%s' % (self.cfg.recipes, self.recipe), remote_path='/opt/%s' % self.recipe, recursive=True)
-            scp.put(self.config, remote_path='/opt/%s/config' % self.recipe)
+            transport = ssh.get_transport()
+            assert transport is not None
+            scp = SCP(transport)
+            scp.put(
+                str(Path(self.cfg.recipes) / self.recipe),
+                remote_path=f"/opt/{self.recipe}",
+                recursive=True,
+            )
+            scp.put(str(self.config), remote_path=f"/opt/{self.recipe}/config")
 
         try:
             if self._type == self.Type.VIRTUAL:
-                ssh.execute('%s %s' % (self.cfg.installer, self.recipe))
+                ssh.execute(f"{self.cfg.installer} {self.recipe}")
             elif self._type == self.Type.DEFINED:
-                if not isfile('%s/%s/run' % (self.cfg.recipes, self.recipe)):
+                if not (Path(self.cfg.recipes) / self.recipe / "run").is_file():
                     # Recipes with no run file are acceptable since they (may) have a require file
                     # and don't necessarily require the execution of anything of their own.
-                    self.log.warn("%s doesn't have a run file. Continuing..." % self.recipe)
+                    self.log.warning(
+                        "Recipe '%s' has no run file; continuing", self.recipe
+                    )
                 else:
-                    ssh.execute('cd /opt/%s && chmod +x ./run && ./run' % self.recipe, show_command=False)
+                    ssh.execute(
+                        f"cd /opt/{self.recipe} && chmod +x ./run && ./run",
+                        show_command=False,
+                    )
             passed = True
-        except Exception:
+        except Exception as exc:  # pylint: disable=broad-except
+            self.log.error(str(exc))
             passed = False
         finally:
             if self._type == self.Type.DEFINED:
-                self.log.info('Deleting /opt/%s from remote host' % self.recipe)
-                ssh.execute('rm -rf /opt/%s' % self.recipe, show_command=False)
+                self.log.info(f"Removing /opt/{self.recipe} from remote host")
+                ssh.execute(f"rm -rf /opt/{self.recipe}", show_command=False)
 
         if not passed:
-            self.log.fatal('Failed to deploy %s' % self.recipe)
-        self.log.success('Done with %s' % self.recipe)
+            self.log.error("Failed to deploy %s", self.recipe)
+        self.log.info("Done with %s", self.recipe)

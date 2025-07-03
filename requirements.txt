@@ -1,5 +1,8 @@
-paramiko
-requests
-python-dotenv
-scp
-cryptography>=39.0.1 # not directly required, pinned by Snyk to avoid a vulnerability
+paramiko==3.5.1
+requests==2.32.4
+python-dotenv==1.1.1
+scp==0.15.0
+cryptography>=45.0.4 # not directly required, pinned to avoid a vulnerability
+pylint==3.3.7
+pytest==8.4.1
+pyright==1.1.402
