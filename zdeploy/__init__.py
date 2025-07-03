@@ -12,9 +12,6 @@ from zdeploy.log import Log
 from zdeploy.app import deploy
 from zdeploy.config import load as load_config, Config
 
-log = Log()
-log.register_logger(stdout)
-
 
 def deploy_config(config_name: str, args: Namespace, cfg: Config) -> None:
     """Deploy a single configuration."""
@@ -25,10 +22,12 @@ def deploy_config(config_name: str, args: Namespace, cfg: Config) -> None:
     if not cache_dir_path.is_dir():
         cache_dir_path.mkdir(parents=True)
     log_file_path = log_dir_path / f"{datetime.now():%Y-%m-%d %H:%M:%S}.log"
+    logger = Log()
+    logger.register_logger(stdout)
     with log_file_path.open("w", encoding="utf-8") as log_file:
-        log.register_logger(log_file)
-        deploy(config_name, cache_dir_path, log, args, cfg)
-        log.loggers.remove(log_file)
+        logger.register_logger(log_file)
+        deploy(config_name, cache_dir_path, logger, args, cfg)
+        logger.loggers.remove(log_file)
 
 
 def deploy_configs(args: Namespace, cfg: Config) -> None:
