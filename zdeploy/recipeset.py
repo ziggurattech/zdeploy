@@ -2,16 +2,16 @@
 
 from hashlib import md5
 from typing import Iterable
+import logging
 
 from zdeploy.config import Config
-from zdeploy.log import Log
 from zdeploy.recipe import Recipe
 
 
 class RecipeSet(set[Recipe]):
     """Container for ``Recipe`` objects with convenience helpers."""
 
-    def __init__(self, cfg: Config, log: Log) -> None:
+    def __init__(self, cfg: Config, log: logging.Logger) -> None:
         """Create an empty ``RecipeSet`` using ``cfg`` and ``log``."""
 
         super().__init__()
@@ -28,23 +28,23 @@ class RecipeSet(set[Recipe]):
         """Add a single ``recipe`` if not already present."""
 
         if recipe in self:
-            self.log.warn(f"Recipe '{recipe.name}' is already added; skipping")
+            self.log.warning("Recipe '%s' is already added; skipping", recipe.name)
             return
-        self.log.info(f"Registering recipe '{recipe.name}'")
+        self.log.info("Registering recipe '%s'", recipe.name)
         super().add(recipe)
         if recipe.is_virtual():
-            self.log.warn(
+            self.log.warning(
                 (
                     f"Recipe '{recipe.recipe}' is not found under {self.cfg.recipes} "
                     "and will be treated as a system package"
                 )
             )
-            self.log.warn(
+            self.log.warning(
                 (
                     f"The package will be installed using `{recipe.cfg.installer} {recipe.recipe}`"
                 )
             )
-            self.log.warn(
+            self.log.warning(
                 (
                     "To use a different package manager, specify "
                     "an 'installer' entry in config.json"

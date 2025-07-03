@@ -5,16 +5,16 @@ from pathlib import Path
 from shutil import rmtree
 from datetime import datetime
 from argparse import Namespace
+import logging
 
 from dotenv import load_dotenv
 from zdeploy.recipe import Recipe
 from zdeploy.recipeset import RecipeSet
 from zdeploy.utils import reformat_time
-from zdeploy.log import Log
 from zdeploy.config import Config
 
 
-def _load_recipes(config_path: Path, log: Log, cfg: Config) -> RecipeSet:
+def _load_recipes(config_path: Path, log: logging.Logger, cfg: Config) -> RecipeSet:
     """Return a ``RecipeSet`` loaded from environment variables."""
 
     load_dotenv(str(config_path))
@@ -27,7 +27,7 @@ def _load_recipes(config_path: Path, log: Log, cfg: Config) -> RecipeSet:
         recipe_name = recipe_name.strip()
         host_ip = environ.get(recipe_name)
         if host_ip is None:
-            log.fatal(f"{recipe_name} is undefined in {config_path}")
+            log.error(f"{recipe_name} is undefined in {config_path}")
             raise RuntimeError("undefined host")
         host_user = environ.get(f"{recipe_name}_USER", cfg.user)
         host_password = environ.get(f"{recipe_name}_PASSWORD", cfg.password)
@@ -56,7 +56,7 @@ def _load_recipes(config_path: Path, log: Log, cfg: Config) -> RecipeSet:
     return recipes
 
 
-def _clean_cache(cache_dir_path: Path, deployment_cache_path: Path, log: Log) -> None:
+def _clean_cache(cache_dir_path: Path, deployment_cache_path: Path, log: logging.Logger) -> None:
     """Remove stale cache directories inside ``cache_dir_path``."""
 
     if not deployment_cache_path.is_dir():
@@ -72,7 +72,7 @@ def _deploy_recipe(
     deployment_cache_path: Path,
     force: bool,
     started_all: datetime,
-    log: Log,
+    log: logging.Logger,
 ) -> None:
     """Deploy a single ``recipe`` and update its cache entry."""
 
@@ -81,7 +81,7 @@ def _deploy_recipe(
         with recipe_cache_path.open("r", encoding="utf-8") as fp:
             cache_contents = fp.read()
         if recipe.deep_hash() in cache_contents and not force:
-            log.warn(
+            log.warning(
                 f"Skipping {recipe.name} because it is already deployed"
             )
             return
@@ -99,7 +99,7 @@ def _deploy_recipe(
     )
 
     total_recipe_time = ended_recipe - started_recipe
-    log.success(f"{recipe.name} finished in {reformat_time(total_recipe_time)}")
+    log.info(f"{recipe.name} finished in {reformat_time(total_recipe_time)}")
     with recipe_cache_path.open("w", encoding="utf-8") as fp:
         fp.write(recipe.deep_hash())
 
@@ -107,14 +107,14 @@ def _deploy_recipe(
 def deploy(
     config_name: str,
     cache_dir_path: Path,
-    log: Log,
+    log: logging.Logger,
     args: Namespace,
     cfg: Config,
 ) -> None:
     """Deploy recipes defined in ``config_name``."""
 
     config_path = Path(cfg.configs) / config_name
-    print("Config:", config_path)
+    log.info("Config: %s", config_path)
 
     recipes = _load_recipes(config_path, log, cfg)
 
@@ -134,5 +134,5 @@ def deploy(
     log.info(
         f"Completed deployment of {config_path} at {ended_all:%H:%M:%S} on {started_all:%Y-%m-%d}"
     )
-    log.success(f"{config_path} finished in {reformat_time(total_deployment_time)}")
+    log.info(f"{config_path} finished in {reformat_time(total_deployment_time)}")
     log.info(f"Deployment hash is {recipes.get_hash()}")

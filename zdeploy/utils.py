@@ -2,8 +2,8 @@
 
 
 from datetime import timedelta
-from sys import stderr
 from typing import Union
+import logging
 
 
 def str2bool(value: str) -> bool:
@@ -13,10 +13,7 @@ def str2bool(value: str) -> bool:
     if value in {"yes", "y", "true", "t", "e", "enable"}:
         return True
 
-    print(
-        f"Warning: '{value}' is not recognized as a true value, defaulting to False",
-        file=stderr,
-    )
+    logging.warning("'%s' is not recognized as a true value, defaulting to False", value)
     return False
 
 

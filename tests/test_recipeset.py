@@ -1,12 +1,12 @@
 import zdeploy.recipe as recipe_mod
 from zdeploy.recipeset import RecipeSet
-from zdeploy.log import Log
+import logging
 from zdeploy.config import Config
 
 
 def test_recipeset_iterable(tmp_path):
     cfg = Config(recipes=str(tmp_path))
-    log = Log()
+    log = logging.getLogger("test")
     r = recipe_mod.Recipe(
         "pkg1",
         None,

@@ -1,9 +1,8 @@
 """Remote client helpers for recipes."""
 
+import logging
 from paramiko import SSHClient, AutoAddPolicy, Transport
 from scp import SCPClient
-
-from zdeploy.log import Log
 
 
 class SSH(SSHClient):
@@ -13,7 +12,7 @@ class SSH(SSHClient):
     def __init__(
         self,
         recipe: str,
-        log: Log,
+        log: logging.Logger,
         hostname: str,
         username: str,
         password: str | None,
@@ -44,7 +43,7 @@ class SSH(SSHClient):
         """Run ``args`` over SSH and return the exit code."""
         cmd = " ".join(args)
         if show_command:
-            self.log.info("Running", cmd)
+            self.log.info("Running %s", cmd)
         _, stdout, _ = self.exec_command(f"{cmd} 2>&1")
         if show_output:
             for line in stdout:
@@ -52,7 +51,7 @@ class SSH(SSHClient):
         rc = stdout.channel.recv_exit_status()
         if rc != 0:
             if show_error:
-                self.log.fail(f"Failed to run '{cmd}'. Exit code: {rc}")
+                self.log.error("Failed to run '%s'. Exit code: %s", cmd, rc)
             if bail_on_failure:
                 raise RuntimeError(f"failed to execute {cmd}")
         return rc

@@ -5,10 +5,10 @@ from os import listdir
 from pathlib import Path
 from hashlib import md5
 from typing import Dict, List, Optional
+import logging
 
 from zdeploy.clients import SSH, SCP
 from zdeploy.shell import execute as shell_execute
-from zdeploy.log import Log
 from zdeploy.config import Config
 
 
@@ -30,22 +30,26 @@ class Recipe:
         username: str,
         password: str | None,
         port: int,
-        log: Log,
+        log: logging.Logger,
         cfg: Config,
     ) -> None:
         """Initialize a recipe instance."""
 
         self.log = log
         if not str(config).strip():
-            self.log.fatal("Invalid value for config")
+            self.log.error("Invalid value for config")
+            raise ValueError("invalid config")
         if not recipe or not recipe.strip():
-            self.log.fatal("Invalid value for recipe")
+            self.log.error("Invalid value for recipe")
+            raise ValueError("invalid recipe")
         if not hostname or not hostname.strip():
-            self.log.fatal("Invalid value for hostname")
+            self.log.error("Invalid value for hostname")
+            raise ValueError("invalid hostname")
         try:
             self.port = int(port)
         except ValueError:
-            self.log.fatal(f"Invalid value for port: {port}")
+            self.log.error("Invalid value for port: %s", port)
+            raise
 
         self.cfg = cfg
         self.parent_recipe = parent_recipe
@@ -69,9 +73,9 @@ class Recipe:
                 self.recipe = r
                 if self.parent_recipe == r:
                     # Recipe references itself
-                    self.log.fatal(f"Invalid recipe: {r} references itself")
-                else:
-                    self._type = self.Type.DEFINED
+                    self.log.error("Invalid recipe: %s references itself", r)
+                    raise ValueError("recipe references itself")
+                self._type = self.Type.DEFINED
                 return
         self.recipe = recipe
         self._type = self.Type.VIRTUAL
@@ -197,8 +201,8 @@ class Recipe:
                 if not (Path(self.cfg.recipes) / self.recipe / "run").is_file():
                     # Recipes with no run file are acceptable since they (may) have a require file
                     # and don't necessarily require the execution of anything of their own.
-                    self.log.warn(
-                        f"Recipe '{self.recipe}' has no run file; continuing"
+                    self.log.warning(
+                        "Recipe '%s' has no run file; continuing", self.recipe
                     )
                 else:
                     ssh.execute(
@@ -207,7 +211,7 @@ class Recipe:
                     )
             passed = True
         except Exception as exc:  # pylint: disable=broad-except
-            self.log.fail(str(exc))
+            self.log.error(str(exc))
             passed = False
         finally:
             if self._type == self.Type.DEFINED:
@@ -215,5 +219,5 @@ class Recipe:
                 ssh.execute(f"rm -rf /opt/{self.recipe}", show_command=False)
 
         if not passed:
-            self.log.fatal(f"Failed to deploy {self.recipe}")
-        self.log.success(f"Done with {self.recipe}")
+            self.log.error("Failed to deploy %s", self.recipe)
+        self.log.info("Done with %s", self.recipe)
