@@ -17,7 +17,9 @@ from zdeploy.config import Config
 def _load_recipes(config_path: Path, log: logging.Logger, cfg: Config) -> RecipeSet:
     """Return a ``RecipeSet`` loaded from environment variables."""
 
-    load_dotenv(str(config_path))
+    # Ensure variables from previous configs do not linger
+    # when deploying multiple configs sequentially.
+    load_dotenv(str(config_path), override=True)
 
     recipes = RecipeSet(cfg, log)
     recipe_names = environ.get("RECIPES", "")
