@@ -1,6 +1,6 @@
 paramiko==3.5.1
 requests==2.32.4
-python-dotenv==1.1.1
+python-dotenv==1.2.2
 scp==0.15.0
 cryptography>=45.0.4 # not directly required, pinned to avoid a vulnerability
 pylint==3.3.7
